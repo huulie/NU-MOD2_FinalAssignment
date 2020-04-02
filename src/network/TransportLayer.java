@@ -8,13 +8,14 @@ import java.net.SocketException;
 
 public class TransportLayer {
 
-	public DatagramSocket openNewDatagramSocket() throws SocketException {
+	public static DatagramSocket openNewDatagramSocket() throws SocketException {
         DatagramSocket socket = new DatagramSocket();
         return socket;
 
 	}
 	
-	public void sendPacket(DatagramSocket socket, Packet packet, int port) throws IOException {
+	public static void sendPacket(DatagramSocket socket, Packet packet, int port) 
+			throws IOException {
 		
 		DatagramPacket datagram = new DatagramPacket(packet.getPayload(), 
 				packet.getPayload().length, packet.getDestinationAddress(), port);
@@ -23,7 +24,7 @@ public class TransportLayer {
 	}
 		
 	
-	public Packet receivePacket(DatagramSocket socket) throws IOException {
+	public static Packet receivePacket(DatagramSocket socket) throws IOException {
 		byte[] buffer = new byte[512];
         DatagramPacket datagram = new DatagramPacket(buffer, buffer.length);
         socket.receive(datagram);
@@ -45,13 +46,13 @@ public class TransportLayer {
 	
 	// TODO: deprecate? 
 	
-	public void sendRequest(DatagramSocket socket, InetAddress address, int port) 
+	public static void sendRequest(DatagramSocket socket, InetAddress address, int port) 
 			throws IOException {
 		DatagramPacket request = new DatagramPacket(new byte[1], 1, address, port);
         socket.send(request);
 	}
 	
-	public String receiveResponse(DatagramSocket socket) throws IOException {
+	public static String receiveResponse(DatagramSocket socket) throws IOException {
 		byte[] buffer = new byte[512];
         DatagramPacket response = new DatagramPacket(buffer, buffer.length);
         socket.receive(response);
