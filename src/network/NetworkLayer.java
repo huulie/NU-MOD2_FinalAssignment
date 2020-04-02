@@ -6,8 +6,8 @@ import java.net.UnknownHostException;
 public class NetworkLayer {
 
 	public InetAddress getAdressByName(String hostname) throws UnknownHostException {
-    InetAddress address = InetAddress.getByName(hostname);
-	return address;
+		InetAddress address = InetAddress.getByName(hostname);
+		return address;
 	}
 	
 }
