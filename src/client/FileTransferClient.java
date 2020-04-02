@@ -24,7 +24,7 @@ public class FileTransferClient {
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
 
-		FileTransferClient helloWorldClient = new FileTransferClient(1234);
+		FileTransferClient helloWorldClient = new FileTransferClient(1234); // TODO now HARDCODED
 		helloWorldClient.requestHelloWorld();
 		System.out.println("DONE: requested a Hello World... ");
 		
@@ -48,17 +48,20 @@ public class FileTransferClient {
 	}
 	
 	public void requestHelloWorld() {
+		System.out.println("Client running.. ");
 		try { // to construct and send a packet
 			String requestHello = "Hello, are you there?";
 
 			Packet requestHelloPacket = new Packet(
 					0, 
 					NetworkLayer.getOwnAddress(), 
-					NetworkLayer.getAdressByName("nu-pi-huub"), 
+					NetworkLayer.getAdressByName("nvc4122.nedap.local"), 
+					//("nu-pi-huub"), // TODO not hardcode, put let user provide input
 					requestHello.getBytes());
 		
 		
-			TransportLayer.sendPacket(this.socket, requestHelloPacket, this.port);
+			TransportLayer.sendPacket(this.socket, requestHelloPacket, 4567); 
+			// TODO for now HARDCODED, not use same port on server as on client 
 		
 		} catch (UnknownHostException e) {
 			// TODO Auto-generated catch block
