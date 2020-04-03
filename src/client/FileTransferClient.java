@@ -8,6 +8,7 @@ import java.net.UnknownHostException;
 import network.NetworkLayer;
 import network.Packet;
 import network.TransportLayer;
+import protocol.FileTransferProtocol;
 
 public class FileTransferClient {
 
@@ -24,9 +25,12 @@ public class FileTransferClient {
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
 
-		FileTransferClient helloWorldClient = new FileTransferClient(1234); // TODO now HARDCODED
+		FileTransferClient helloWorldClient = 
+					new FileTransferClient(FileTransferProtocol.CLIENT_PORT); // TODO now HARDCODED
 		helloWorldClient.requestHelloWorld();
 		System.out.println("DONE: requested a Hello World... ");
+		helloWorldClient.socket.close(); // TODO make a method for this, ensure!
+
 		
 	}
 	
@@ -37,7 +41,7 @@ public class FileTransferClient {
 	 */
 	public FileTransferClient(int port) {
 		try {
-			this.socket = TransportLayer.openNewDatagramSocket();
+			this.socket = TransportLayer.openNewDatagramSocket(port);
 		} catch (SocketException e) {
 			// TODO Auto-generated catch block
 			System.out.println("FAILED to open socket " + e.getLocalizedMessage());
@@ -60,7 +64,11 @@ public class FileTransferClient {
 					requestHello.getBytes());
 		
 		
-			TransportLayer.sendPacket(this.socket, requestHelloPacket, 4567); 
+			TransportLayer.sendPacket(
+					this.socket,
+					requestHelloPacket,
+					FileTransferProtocol.SERVER_PORT
+			); 
 			// TODO for now HARDCODED, not use same port on server as on client 
 		
 		} catch (UnknownHostException e) {
@@ -72,11 +80,21 @@ public class FileTransferClient {
 			System.out.println("FAILED when sending packet " + e.getLocalizedMessage());
 			e.printStackTrace();
 		}
+		
+		
+		try {
+			Packet receivedPacket = TransportLayer.receivePacket(this.socket);
+			
+			byte[] responseBytes = receivedPacket.getPayload(); 
+			
+			String responseString = new String(responseBytes, 0, responseBytes.length);
+			System.out.println("Response received: " + responseString);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			System.out.println("FAILED when receiving packet " + e.getLocalizedMessage());
+			e.printStackTrace();
+		}
+		
 	}
-
-
-
-	
-	
 
 }

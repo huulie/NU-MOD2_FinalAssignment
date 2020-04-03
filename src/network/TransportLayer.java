@@ -8,17 +8,17 @@ import java.net.SocketException;
 
 public class TransportLayer {
 
-	public static DatagramSocket openNewDatagramSocket() throws SocketException {
-        DatagramSocket socket = new DatagramSocket();
+	public static DatagramSocket openNewDatagramSocket(int port) throws SocketException {
+        DatagramSocket socket = new DatagramSocket(port);
         return socket;
 
 	}
 	
-	public static void sendPacket(DatagramSocket socket, Packet packet, int port) 
+	public static void sendPacket(DatagramSocket socket, Packet packet, int destinationPort) 
 			throws IOException {
 		
 		DatagramPacket datagram = new DatagramPacket(packet.getPayload(), 
-				packet.getPayload().length, packet.getDestinationAddress(), port);
+				packet.getPayload().length, packet.getDestinationAddress(), destinationPort);
         
 		socket.send(datagram);
 	}

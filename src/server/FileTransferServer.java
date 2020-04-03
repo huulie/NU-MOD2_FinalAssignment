@@ -9,6 +9,7 @@ import java.net.UnknownHostException;
 import network.NetworkLayer;
 import network.Packet;
 import network.TransportLayer;
+import protocol.FileTransferProtocol;
 
 public class FileTransferServer {
 
@@ -30,9 +31,11 @@ public class FileTransferServer {
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
 
-		FileTransferServer helloWorldServer = new FileTransferServer(4567); // TODO for now HARDCODED
+		FileTransferServer helloWorldServer 
+			= new FileTransferServer(FileTransferProtocol.SERVER_PORT); // TODO now HARDCODED
 		helloWorldServer.receiveHelloWorld();
-		System.out.println("DONE: responded with a Hello World! ");
+		System.out.println("DONE: responded with a Hello World! (or something else) ");
+		helloWorldServer.socket.close(); // TODO make a method for this, ensure!
 		
 	}
 	
@@ -43,7 +46,7 @@ public class FileTransferServer {
 	 */
 	public FileTransferServer(int port) {
 		try {
-			this.socket = TransportLayer.openNewDatagramSocket();
+			this.socket = TransportLayer.openNewDatagramSocket(port);
 		} catch (SocketException e) {
 			// TODO Auto-generated catch block
 			System.out.println("FAILED to open socket " + e.getLocalizedMessage());
@@ -59,10 +62,16 @@ public class FileTransferServer {
 		try {
 			Packet receivedPacket = TransportLayer.receivePacket(this.socket);
 			
-			if (receivedPacket.getPayload() == "Hello, are you there?".getBytes()) { 
+			byte[] responseBytes = receivedPacket.getPayload(); 
+			String responseString = new String(responseBytes, 0, responseBytes.length);
+			
+			if (responseString.contains("Hello, are you there?")) { // TODO .equals doesn't work? 
 				// TODO note encoding
 				this.respondHelloWorld(receivedPacket.getSourceAddress());
-				System.out.println("Responding to request...");
+				System.out.println("Responding to request from " 
+						+ receivedPacket.getSourceAddress().toString() + "...");
+			} else {
+				System.out.println("Don't know what to do with payload: " + responseString);
 			}
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
@@ -76,13 +85,17 @@ public class FileTransferServer {
 			String respondHello = "Hello World!";
 
 			Packet respondHelloPacket = new Packet(
-					0, 
+					1, 
 					NetworkLayer.getOwnAddress(), 
 					respondToAddress, 
 					respondHello.getBytes());
 		
 		
-			TransportLayer.sendPacket(this.socket, respondHelloPacket, 4567);
+			TransportLayer.sendPacket(
+					this.socket,
+					respondHelloPacket,
+					FileTransferProtocol.CLIENT_PORT
+			);
 			// TODO for now HARDCODED, not use same port on server as on client 
 
 		

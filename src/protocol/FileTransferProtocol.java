@@ -22,4 +22,13 @@ public class FileTransferProtocol {
 	public static final char ERROR = '?'; 
 			//From either side, indicates that message is not known/understood
 	
+	/**
+	 * TODO
+	 */
+	public static final char CLIENT_PORT = 1234; 
+	
+	/**
+	 * TODO
+	 */
+	public static final char SERVER_PORT = 4567; 
 }
