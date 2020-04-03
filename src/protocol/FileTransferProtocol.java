@@ -62,7 +62,7 @@ public class FileTransferProtocol {
 	 */
 	public static final int TOTAL_HEADER_SIZE = HEADER_PAYLOAD_LENGTH_LAST;
 	
-	public static final int PAYLOAD_START = HEADER_PAYLOAD_LENGTH_LAST+1;
+	public static final int PAYLOAD_START = HEADER_PAYLOAD_LENGTH_LAST + 1;
 	
 
 	

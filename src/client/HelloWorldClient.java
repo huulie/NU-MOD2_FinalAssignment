@@ -7,6 +7,7 @@ import java.net.UnknownHostException;
 
 import exceptions.PacketException;
 import exceptions.UtilByteException;
+import exceptions.UtilDatagramException;
 import network.NetworkLayer;
 import network.Packet;
 import network.TransportLayer;
@@ -65,7 +66,6 @@ public class HelloWorldClient {
 					//("nu-pi-huub"), // TODO not hardcode, put let user provide input
 					requestHello.getBytes());
 		
-		
 			TransportLayer.sendPacket(
 					this.socket,
 					requestHelloPacket,
@@ -75,10 +75,10 @@ public class HelloWorldClient {
 			System.out.println("Datagram send... ");
 
 		
-		} catch (UnknownHostException e) {
-			// TODO Auto-generated catch block
-			System.out.println("FAILED unknown host " + e.getLocalizedMessage());
-			e.printStackTrace();
+//		} catch (UnknownHostException e) {
+//			// TODO Auto-generated catch block
+//			System.out.println("FAILED unknown host " + e.getLocalizedMessage());
+//			e.printStackTrace();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			System.out.println("FAILED when sending packet " + e.getLocalizedMessage());
@@ -90,6 +90,9 @@ public class HelloWorldClient {
 		} catch (UtilByteException e) {
 			// TODO Auto-generated catch block
 			System.out.println("FAILED  " + e.getLocalizedMessage());
+			e.printStackTrace();
+		} catch (UtilDatagramException e) {
+			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
@@ -108,6 +111,9 @@ public class HelloWorldClient {
 		} catch (PacketException e) {
 			// TODO Auto-generated catch block
 			System.out.println("FAILED on packet " + e.getLocalizedMessage());
+			e.printStackTrace();
+		} catch (UtilDatagramException e) {
+			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		

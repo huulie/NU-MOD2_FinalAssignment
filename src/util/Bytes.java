@@ -4,15 +4,13 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import exceptions.UtilByteException;
-import protocol.FileTransferProtocol;
 
 public class Bytes {
 
 	public static byte[] concatArray(byte[]...arrays) {
 	    // Determine the length of the result array
 	    int totalLength = 0;
-	    for (int i = 0; i < arrays.length; i++)
-	    {
+	    for (int i = 0; i < arrays.length; i++) {
 	        totalLength += arrays[i].length;
 	    }
 
@@ -21,8 +19,7 @@ public class Bytes {
 
 	    // copy the source arrays into the result array
 	    int currentIndex = 0;
-	    for (int i = 0; i < arrays.length; i++)
-	    {
+	    for (int i = 0; i < arrays.length; i++) {
 	        System.arraycopy(arrays[i], 0, result, currentIndex, arrays[i].length);
 	        currentIndex += arrays[i].length;
 	    }
@@ -67,10 +64,10 @@ public class Bytes {
 	 * @throws UtilByteException 
 	 */
 	public static byte[] subArray(byte[] array, int start, int last) throws UtilByteException {
-		if (start < 0 || last < 0 || last+1 > array.length) {
+		if (start < 0 || last < 0 || last + 1 > array.length) {
 			throw new UtilByteException("Indices cannot be negative!");
 		}
 		
-		return Arrays.copyOfRange(array, start, last+1);
+		return Arrays.copyOfRange(array, start, last + 1);
 	}
 }

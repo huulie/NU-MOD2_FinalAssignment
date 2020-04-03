@@ -4,11 +4,11 @@ import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.util.Arrays;
 
 import exceptions.PacketException;
 import exceptions.UtilByteException;
+import exceptions.UtilDatagramException;
 import network.NetworkLayer;
 import network.Packet;
 import network.TransportLayer;
@@ -66,14 +66,14 @@ public class HelloWorldServer {
 			Packet receivedPacket = TransportLayer.receivePacket(this.socket);
 			
 			byte[] responseBytes = receivedPacket.getPayload(); 
-			String responseString = new String(responseBytes).strip();
+			String responseString = new String(responseBytes);
 			
 			System.out.println(Arrays.toString(responseBytes));
 			System.out.println(Arrays.toString(responseString.getBytes()));
 			System.out.println(Arrays.toString("Hello, are you there?".getBytes()));
 
 			
-			if (responseString.equals("Hello, are you there?")) { // TODO contains: .equals doesn't work? 
+			if (responseString.equals("Hello, are you there?")) {
 				// TODO note encoding
 				this.respondHelloWorld(receivedPacket.getSourceAddress());
 				System.out.println("Responding to request from " 
@@ -88,6 +88,10 @@ public class HelloWorldServer {
 		} catch (PacketException e) {
 			// TODO Auto-generated catch block
 			System.out.println("FAILED on packet " + e.getLocalizedMessage());
+			e.printStackTrace();
+		} catch (UtilDatagramException e) {
+			// TODO Auto-generated catch block
+			System.out.println("FAILED " + e.getLocalizedMessage());
 			e.printStackTrace();
 		}
 	}
@@ -108,13 +112,7 @@ public class HelloWorldServer {
 					respondHelloPacket,
 					FileTransferProtocol.CLIENT_PORT
 			);
-			// TODO for now HARDCODED, not use same port on server as on client 
-
 		
-		} catch (UnknownHostException e) {
-			// TODO Auto-generated catch block
-			System.out.println("FAILED unknown host " + e.getLocalizedMessage());
-			e.printStackTrace();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			System.out.println("FAILED when sending packet " + e.getLocalizedMessage());
@@ -126,6 +124,9 @@ public class HelloWorldServer {
 		} catch (UtilByteException e) {
 			// TODO Auto-generated catch block
 			System.out.println("FAILED on " + e.getLocalizedMessage());
+			e.printStackTrace();
+		} catch (UtilDatagramException e) {
+			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}

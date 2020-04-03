@@ -27,7 +27,6 @@ public class Packet {
 	/**
 	* TODO
 	*/
-	
 	private int payloadLength;
 	
 	public Packet(int id, InetAddress sourceAddress, InetAddress destinationAddress,
@@ -84,12 +83,5 @@ public class Packet {
 		}
 		
 	}
-	
-	
-	
-
-
-	
-	
 	
 }
