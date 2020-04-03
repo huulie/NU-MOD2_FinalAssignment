@@ -23,12 +23,51 @@ public class FileTransferProtocol {
 			//From either side, indicates that message is not known/understood
 	
 	/**
-	 * TODO
+	 * TODO .
 	 */
-	public static final char CLIENT_PORT = 1234; 
+	public static final int CLIENT_PORT = 1234; 
+	
+	/**
+	 * TODO .
+	 */
+	public static final int SERVER_PORT = 4567; 
+	
+
 	
 	/**
 	 * TODO
 	 */
-	public static final char SERVER_PORT = 4567; 
+	// PACKET DATA FORMAT: header (x bytes) + payload (maximum size: PACKET_SIZE - x bytes)
+	// header (bytes): payloadLength ( =
+	// NOTE: number of bytes of payloadLength field is dependent on PACKET_SIZE: length (in bytes) = log2(PACKET_SIZE)/8
+	// NOTE: part of the datagram header (like address and port) is managed by the used libraries, and thus not included here.
+
+	/**
+	 * TODO .
+	 */
+	public static final int MAX_PACKET_SIZE = 256;
+	
+	/**
+	 * TODO . 
+	 * NOTE: payload length should be encoded with big-endian encoding
+	 */
+	public static final int HEADER_PAYLOAD_LENGTH_START = 0;
+	public static final int HEADER_PAYLOAD_LENGTH_LAST = HEADER_PAYLOAD_LENGTH_START 
+			//+ (int) Math.ceil(Math.log(MAX_PACKET_SIZE) / Math.log(2) / 8);
+			+ 3; // TODO the int2Byte always puts in block of 4 bytes 
+
+	/**
+	 * TODO .
+	 * set total header size to last assigned header field
+	 */
+	public static final int TOTAL_HEADER_SIZE = HEADER_PAYLOAD_LENGTH_LAST;
+	
+	public static final int PAYLOAD_START = HEADER_PAYLOAD_LENGTH_LAST+1;
+	
+
+	
+	/**
+	 * TODO .
+	 */
+	public static final int MAX_PAYLOAD_LENGTH = MAX_PACKET_SIZE - TOTAL_HEADER_SIZE; 
 }

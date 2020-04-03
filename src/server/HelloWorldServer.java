@@ -5,7 +5,10 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.Arrays;
 
+import exceptions.PacketException;
+import exceptions.UtilByteException;
 import network.NetworkLayer;
 import network.Packet;
 import network.TransportLayer;
@@ -63,9 +66,14 @@ public class HelloWorldServer {
 			Packet receivedPacket = TransportLayer.receivePacket(this.socket);
 			
 			byte[] responseBytes = receivedPacket.getPayload(); 
-			String responseString = new String(responseBytes, 0, responseBytes.length);
+			String responseString = new String(responseBytes).strip();
 			
-			if (responseString.contains("Hello, are you there?")) { // TODO .equals doesn't work? 
+			System.out.println(Arrays.toString(responseBytes));
+			System.out.println(Arrays.toString(responseString.getBytes()));
+			System.out.println(Arrays.toString("Hello, are you there?".getBytes()));
+
+			
+			if (responseString.equals("Hello, are you there?")) { // TODO contains: .equals doesn't work? 
 				// TODO note encoding
 				this.respondHelloWorld(receivedPacket.getSourceAddress());
 				System.out.println("Responding to request from " 
@@ -76,6 +84,10 @@ public class HelloWorldServer {
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			System.out.println("FAILED when receiving packet " + e.getLocalizedMessage());
+			e.printStackTrace();
+		} catch (PacketException e) {
+			// TODO Auto-generated catch block
+			System.out.println("FAILED on packet " + e.getLocalizedMessage());
 			e.printStackTrace();
 		}
 	}
@@ -106,6 +118,14 @@ public class HelloWorldServer {
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			System.out.println("FAILED when sending packet " + e.getLocalizedMessage());
+			e.printStackTrace();
+		} catch (PacketException e) {
+			// TODO Auto-generated catch block
+			System.out.println("FAILED on packet " + e.getLocalizedMessage());
+			e.printStackTrace();
+		} catch (UtilByteException e) {
+			// TODO Auto-generated catch block
+			System.out.println("FAILED on " + e.getLocalizedMessage());
 			e.printStackTrace();
 		}
 	}

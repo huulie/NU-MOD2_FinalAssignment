@@ -5,6 +5,8 @@ import java.net.DatagramSocket;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 
+import exceptions.PacketException;
+import exceptions.UtilByteException;
 import network.NetworkLayer;
 import network.Packet;
 import network.TransportLayer;
@@ -28,7 +30,7 @@ public class HelloWorldClient {
 		HelloWorldClient helloWorldClient = 
 					new HelloWorldClient(FileTransferProtocol.CLIENT_PORT); // TODO now HARDCODED
 		helloWorldClient.requestHelloWorld();
-		System.out.println("DONE: requested a Hello World... ");
+		System.out.println("DONE: requested a Hello World and got an answer!");
 		helloWorldClient.socket.close(); // TODO make a method for this, ensure!
 
 		
@@ -69,7 +71,9 @@ public class HelloWorldClient {
 					requestHelloPacket,
 					FileTransferProtocol.SERVER_PORT
 			); 
-			// TODO for now HARDCODED, not use same port on server as on client 
+			
+			System.out.println("Datagram send... ");
+
 		
 		} catch (UnknownHostException e) {
 			// TODO Auto-generated catch block
@@ -78,6 +82,14 @@ public class HelloWorldClient {
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			System.out.println("FAILED when sending packet " + e.getLocalizedMessage());
+			e.printStackTrace();
+		} catch (PacketException e) {
+			// TODO Auto-generated catch block
+			System.out.println("FAILED on packet " + e.getLocalizedMessage());
+			e.printStackTrace();
+		} catch (UtilByteException e) {
+			// TODO Auto-generated catch block
+			System.out.println("FAILED  " + e.getLocalizedMessage());
 			e.printStackTrace();
 		}
 		
@@ -92,6 +104,10 @@ public class HelloWorldClient {
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			System.out.println("FAILED when receiving packet " + e.getLocalizedMessage());
+			e.printStackTrace();
+		} catch (PacketException e) {
+			// TODO Auto-generated catch block
+			System.out.println("FAILED on packet " + e.getLocalizedMessage());
 			e.printStackTrace();
 		}
 		
