@@ -6,6 +6,7 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import exceptions.PacketException;
@@ -60,14 +61,14 @@ public class FileTransferServer implements Runnable {
 		this.TUI = new UI.TUI();
 
 		// Do setup
-		boolean setup = true;
-		while (setup) {
+		boolean setupSucces = false;
+		while (!setupSucces) {
 			try {
-				this.setup();
+				setupSucces = this.setup();
 			} catch (exceptions.ExitProgram eExit) {
 				// If setup() throws an ExitProgram exception, stop the program.
 				if (!TUI.getBoolean("Do you want to retry setup?")) {
-					setup = false;
+					setupSucces = false;
 				}
 			}
 		}
@@ -81,8 +82,10 @@ public class FileTransferServer implements Runnable {
 	 *                     port and the user decides to exit the program.
 	 * @ensures a serverSocket is opened.
 	 */
-	public void setup() throws exceptions.ExitProgram {
+	public boolean setup() throws exceptions.ExitProgram {
 		TUI.showMessage("Setting up the server...");
+		boolean success = false;
+		
 		// First, initialise the Server.
 		// SERVERNAME = TUI.getString("What is the name of this server?"); // TODO name? 
 
@@ -102,7 +105,7 @@ public class FileTransferServer implements Runnable {
 			}
 		}
 		TUI.showMessage("Server now bound to port " + port);
-
+		success = true;
 
 		try {
 			this.ownAddress = NetworkLayer.getOwnAddress(); // TODO replace by discover?
@@ -112,6 +115,7 @@ public class FileTransferServer implements Runnable {
 		} 
 
 		TUI.showMessage("Setup complete!");
+		return success;
 	}
 
 
@@ -131,10 +135,16 @@ public class FileTransferServer implements Runnable {
 
 				Packet receivedPacket = TransportLayer.receivePacket(this.socket);
 
-				if (receivedPacket.getPayload().equals(FileTransferProtocol.INIT_SESSION)) {
+				System.out.println(Arrays.toString(receivedPacket.getPayload()));
+				System.out.println(Arrays.toString(FileTransferProtocol.INIT_SESSION));
+
+				if (Arrays.equals(receivedPacket.getPayload() , (FileTransferProtocol.INIT_SESSION))) { 
+					// TODO note: different from .equals() for strings!
 					this.handleSessionRequest(receivedPacket);
 				} else {
-					TUI.showMessage("Unknown packet: dropping");
+					TUI.showError("Unknown packet: dropping");
+					TUI.showError("Content was: : " + util.PacketUtil.convertPayloadtoString(receivedPacket)
+							+ " (in bytes: " + Arrays.toString(receivedPacket.getPayload()) + ")");
 					// TODO send unknown message back? 
 				}
 
