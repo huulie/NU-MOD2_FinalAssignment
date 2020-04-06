@@ -12,6 +12,12 @@ public class Packet {
 	 */
 	private InetAddress sourceAddress;
 	private InetAddress destinationAddress;
+	
+	/**
+	 * TODO
+	 */
+	private int sourcePort;
+	private int destinationPort;
 
 	/**
 	 * TODO
@@ -29,14 +35,17 @@ public class Packet {
 	*/
 	private int payloadLength;
 	
-	public Packet(int id, InetAddress sourceAddress, InetAddress destinationAddress,
-			byte[] payload) throws PacketException {
+	public Packet(int id, InetAddress sourceAddress, int sourcePort, InetAddress destinationAddress,
+			int destinationPort, byte[] payload) throws PacketException {
 		this.id = id;
 		this.setSourceAddress(sourceAddress);
+		this.setSourcePort(sourcePort);
 		this.setDestinationAddress(destinationAddress);
+		this.setDestinationPort(destinationPort);
 		this.ack = false;
 		
-		this.setPayload(payload); // note: do not assign directly, because lenght will not be set! TODO
+		this.setPayload(payload); 
+		// note: do not assign directly, because lenght will not be set! TODO
 	}
 	
 	public int getId() {
@@ -57,6 +66,22 @@ public class Packet {
 
 	public void setDestinationAddress(InetAddress destinationAddress) {
 		this.destinationAddress = destinationAddress;
+	}	
+	
+	public int getSourcePort() {
+		return sourcePort;
+	}
+
+	public void setSourcePort(int sourcePort) {
+		this.sourcePort = sourcePort;
+	}
+
+	public int getDestinationPort() {
+		return destinationPort;
+	}
+
+	public void setDestinationPort(int destinationPort) {
+		this.destinationPort = destinationPort;
 	}	
 	
 	public boolean isAck() {

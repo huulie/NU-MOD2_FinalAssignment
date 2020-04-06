@@ -11,6 +11,11 @@ import protocol.FileTransferProtocol;
 
 public class TransportLayer {
 
+	public static DatagramSocket openNewDatagramSocket() throws SocketException {
+        DatagramSocket socket = new DatagramSocket();
+        return socket;
+	}
+	
 	public static DatagramSocket openNewDatagramSocket(int port) throws SocketException {
         DatagramSocket socket = new DatagramSocket(port);
         return socket;
@@ -30,16 +35,7 @@ public class TransportLayer {
         DatagramPacket datagram = new DatagramPacket(buffer, buffer.length);
         socket.receive(datagram);
         
-        // TODO
-        // getLength()
-        // Returns the length of the data to be sent or the length of the data received.
-        
-        byte[] data = datagram.getData();
-
-        int payloadLength = util.Datagram.getHeaderPayloadLength(data); 
-        byte[] payload = util.Datagram.getPayload(data, payloadLength);
-
-        return util.Datagram.createPacketFromDatagram(datagram, payload);
+        return util.Datagram.createPacketFromDatagram(datagram,socket);
 	}
 	
 }

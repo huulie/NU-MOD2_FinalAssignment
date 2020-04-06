@@ -32,7 +32,20 @@ public class FileTransferProtocol {
 	 */
 	public static final int SERVER_PORT = 4567; 
 	
-
+	/**
+	 * TODO .
+	 */
+	public static final byte[] INIT_SESSION = "INIT".getBytes(); 
+	
+	/**
+	 * TODO . only in current directory
+	 */
+	public static final String LIST_FILES = "ls";
+	
+	/**
+	 * TODO .
+	 */
+	public static final String DOWNLOAD_SINGLE = "downSingle";
 	
 	/**
 	 * TODO
