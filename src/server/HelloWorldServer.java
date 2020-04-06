@@ -35,7 +35,7 @@ public class HelloWorldServer {
 		// TODO Auto-generated method stub
 
 		HelloWorldServer helloWorldServer 
-			= new HelloWorldServer(FileTransferProtocol.SERVER_PORT); // TODO now HARDCODED
+			= new HelloWorldServer(FileTransferProtocol.DEFAULT_SERVER_PORT); // TODO now HARDCODED
 		helloWorldServer.receiveHelloWorld();
 		System.out.println("DONE: responded with a Hello World! (or something else) ");
 		helloWorldServer.socket.close(); // TODO make a method for this, ensure!
@@ -103,16 +103,16 @@ public class HelloWorldServer {
 			Packet respondHelloPacket = new Packet(
 					1, 
 					NetworkLayer.getOwnAddress(),
-					FileTransferProtocol.SERVER_PORT,
+					FileTransferProtocol.DEFAULT_SERVER_PORT,
 					respondToAddress, 
-					 FileTransferProtocol.CLIENT_PORT,
+					 FileTransferProtocol.DEFAULT_CLIENT_PORT,
 					respondHello.getBytes());
 		
 		
 			TransportLayer.sendPacket(
 					this.socket,
 					respondHelloPacket,
-					FileTransferProtocol.CLIENT_PORT
+					FileTransferProtocol.DEFAULT_CLIENT_PORT
 			);
 		
 		} catch (IOException e) {

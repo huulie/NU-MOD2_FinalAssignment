@@ -29,7 +29,7 @@ public class HelloWorldClient {
 		// TODO Auto-generated method stub
 
 		HelloWorldClient helloWorldClient = 
-					new HelloWorldClient(FileTransferProtocol.CLIENT_PORT); // TODO now HARDCODED
+					new HelloWorldClient(FileTransferProtocol.DEFAULT_CLIENT_PORT); // TODO now HARDCODED
 		helloWorldClient.requestHelloWorld();
 		System.out.println("DONE: requested a Hello World and got an answer!");
 		helloWorldClient.socket.close(); // TODO make a method for this, ensure!
@@ -62,16 +62,16 @@ public class HelloWorldClient {
 			Packet requestHelloPacket = new Packet(
 					0, 
 					NetworkLayer.getOwnAddress(),
-					FileTransferProtocol.CLIENT_PORT,
+					FileTransferProtocol.DEFAULT_CLIENT_PORT,
 					NetworkLayer.getAdressByName("nvc4122.nedap.local"), 
 					//("nu-pi-huub"), // TODO not hardcode, put let user provide input
-					FileTransferProtocol.SERVER_PORT,
+					FileTransferProtocol.DEFAULT_SERVER_PORT,
 					requestHello.getBytes());
 		
 			TransportLayer.sendPacket(
 					this.socket,
 					requestHelloPacket,
-					FileTransferProtocol.SERVER_PORT
+					FileTransferProtocol.DEFAULT_SERVER_PORT
 			); 
 			
 			System.out.println("Datagram send... ");

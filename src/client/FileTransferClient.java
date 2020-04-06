@@ -142,7 +142,7 @@ public class FileTransferClient {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} 
-		this.serverPort = FileTransferProtocol.SERVER_PORT;
+		this.serverPort = FileTransferProtocol.DEFAULT_SERVER_PORT;
 	}
 	
 	
@@ -282,7 +282,7 @@ public class FileTransferClient {
 			port = Integer.parseInt(args[0]);
 			System.out.println("Using specified client port " + port + "...");
 		} else {
-			port = FileTransferProtocol.CLIENT_PORT;
+			port = FileTransferProtocol.DEFAULT_CLIENT_PORT;
 			System.out.println("Using default client port " + port + "...");
 		}
 			

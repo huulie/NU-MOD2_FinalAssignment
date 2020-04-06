@@ -25,12 +25,12 @@ public class FileTransferProtocol {
 	/**
 	 * TODO .
 	 */
-	public static final int CLIENT_PORT = 1234; 
+	public static final int DEFAULT_CLIENT_PORT = 1234; 
 	
 	/**
 	 * TODO .
 	 */
-	public static final int SERVER_PORT = 4567; 
+	public static final int DEFAULT_SERVER_PORT = 4567; 
 	
 	/**
 	 * TODO .

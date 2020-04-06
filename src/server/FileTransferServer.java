@@ -241,7 +241,7 @@ public class FileTransferServer implements Runnable {
 			port = Integer.parseInt(args[0]);
 			System.out.println("Using specified server port " + port + "...");
 		} else {
-			port = FileTransferProtocol.SERVER_PORT;
+			port = FileTransferProtocol.DEFAULT_SERVER_PORT;
 			System.out.println("Using default server port " + port + "...");
 		}
 			
