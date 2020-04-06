@@ -4,17 +4,9 @@ import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 import exceptions.PacketException;
 import exceptions.UtilByteException;
 import exceptions.UtilDatagramException;
-import network.NetworkLayer;
 import network.Packet;
 import network.TransportLayer;
 import protocol.FileTransferProtocol;
@@ -134,7 +126,7 @@ public class FileTransferClientHandler implements Runnable {
 
 	}
 
-	public String[] getArguments(String requestString) {
+	public String[] getArguments(String requestString) { // TODO in shared sperate method?
 		String[] split = requestString.split(FileTransferProtocol.DELIMITER);
 		return split;
 	}
@@ -161,7 +153,7 @@ public class FileTransferClientHandler implements Runnable {
 		
 	}
 	
-	public void sendBytesToClient(byte[] bytesToSend) {
+	public void sendBytesToClient(byte[] bytesToSend) { // TODO put in seperate utility?
 		try { // to construct and send a packet
 			Packet packet = new Packet(
 						0, // TODO id
@@ -175,10 +167,10 @@ public class FileTransferClientHandler implements Runnable {
 			TransportLayer.sendPacket(
 					this.socket,
 					packet,
-					this.ownPort
+					this.clientPort
 			); 
 			
-			TUI.showMessage("Notification send!");
+			TUI.showMessage("Bytes send!");
 			
 		} catch (UnknownHostException | PacketException e) {
 			// TODO Auto-generated catch block

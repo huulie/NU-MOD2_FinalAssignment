@@ -8,7 +8,7 @@ package UI;
 public class TUICommands {
 
 	// Commands to control local TUI and/or program	
-	public static final char EXIT = 'x';
+	public static final String EXIT = "x";
 	public static final char HELP = 'h';
 		
 	
