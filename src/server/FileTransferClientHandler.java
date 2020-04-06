@@ -111,7 +111,7 @@ public class FileTransferClientHandler implements Runnable {
 		String command = request[0]; //.charAt(0); // TODO or String?
 		// TODO check string being null, to prevent nullpointer exception?!
 
-		try {
+//		try {
 			switch (command) {
 				case FileTransferProtocol.LIST_FILES:
 					// do something
@@ -127,9 +127,9 @@ public class FileTransferClientHandler implements Runnable {
 				default:
 					TUI.showError("Unknow command received"); // what TODO with it?
 			}
-		} catch (Exception e) { // TODO specify!
-
-		}
+//		} catch (Exception e) { // TODO specify!
+//
+//		}
 		TUI.showMessage("... done!");
 
 	}
