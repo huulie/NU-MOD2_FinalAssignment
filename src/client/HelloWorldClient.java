@@ -61,9 +61,11 @@ public class HelloWorldClient {
 
 			Packet requestHelloPacket = new Packet(
 					0, 
-					NetworkLayer.getOwnAddress(), 
+					NetworkLayer.getOwnAddress(),
+					FileTransferProtocol.CLIENT_PORT,
 					NetworkLayer.getAdressByName("nvc4122.nedap.local"), 
 					//("nu-pi-huub"), // TODO not hardcode, put let user provide input
+					FileTransferProtocol.SERVER_PORT,
 					requestHello.getBytes());
 		
 			TransportLayer.sendPacket(

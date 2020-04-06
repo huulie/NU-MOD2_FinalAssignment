@@ -102,8 +102,10 @@ public class HelloWorldServer {
 
 			Packet respondHelloPacket = new Packet(
 					1, 
-					NetworkLayer.getOwnAddress(), 
+					NetworkLayer.getOwnAddress(),
+					FileTransferProtocol.SERVER_PORT,
 					respondToAddress, 
+					 FileTransferProtocol.CLIENT_PORT,
 					respondHello.getBytes());
 		
 		

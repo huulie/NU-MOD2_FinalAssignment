@@ -1,6 +1,7 @@
 package util;
 
 import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.net.InetAddress;
 
 import exceptions.PacketException;
@@ -87,12 +88,32 @@ public class Datagram {
 	}
 	
 	
-	public static Packet createPacketFromDatagram(DatagramPacket datagram, byte[] payload) 
-			throws PacketException {
+	/**
+	 * TODO note only works for received datagrams! 
+	 * @param datagram
+	 * @param localSocket
+	 * @return
+	 * @throws PacketException
+	 * @throws UtilDatagramException 
+	 */
+	public static Packet createPacketFromDatagram(DatagramPacket datagram, DatagramSocket receivingSocket) 
+			throws PacketException, UtilDatagramException {
+		
+		// TODO
+        // getLength()
+        // Returns the length of the data to be sent or the length of the data received.
+        
+        byte[] data = datagram.getData();
+
+        int payloadLength = util.Datagram.getHeaderPayloadLength(data); 
+        byte[] payload = util.Datagram.getPayload(data, payloadLength);
+		
 		Packet packet = new Packet(
 				0, 
-				util.Datagram.getDatagramSourceAddress(datagram), 
-				null, // TODO: cannot be retrieved, assume own address? (note: lookup takes time!) 
+				util.Datagram.getDatagramSourceAddress(datagram),
+				datagram.getPort(),
+				receivingSocket.getLocalAddress(), // TODO: assume own address? 
+				receivingSocket.getPort(), // TODO: retains binding to port number, or LOCALport?
 				payload// TODO: remove any padding?! Based on payload length field
 				); // TODO: id, null should be own address / from datagram?
 		
