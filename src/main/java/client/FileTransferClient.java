@@ -137,7 +137,7 @@ public class FileTransferClient {
 	
 	public void setServer() { //(InetAddress serverAdress, int serverPort) {
 		try {
-			this.serverAddress = NetworkLayer.getAdressByName("nvc4122.nedap.local");
+			this.serverAddress = NetworkLayer.getAdressByName("nu-pi-huub"); //("nvc4122.nedap.local");
 		} catch (UnknownHostException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

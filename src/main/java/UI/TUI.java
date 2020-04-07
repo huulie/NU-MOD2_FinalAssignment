@@ -66,7 +66,7 @@ public class TUI  { // TODO implements Runnable ?
 			printHelpMenu();
 			break;
 			
-			case TUICommands.EXIT:
+			case 'x': //TUICommands.EXIT: TODO make this string/char compatible
     			String confirmation = null;
 
     			while (confirmation == null) {
