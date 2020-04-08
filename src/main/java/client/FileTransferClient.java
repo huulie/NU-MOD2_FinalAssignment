@@ -117,7 +117,6 @@ public class FileTransferClient {
 			TUI.showMessage("Setup complete!");
 		}
 		
-		TUI.showMessage("Setup complete!");
 		return success;
 	}
 	
