@@ -88,12 +88,24 @@ public class Bytes {
 		return byteArrayOutputStream.toByteArray();
 	}
 	
-	public static File[] deserialiseByteArrayTofileArray(byte[] byteArray) throws ClassNotFoundException, IOException {
+	public static File[] deserialiseByteArrayToFileArray(byte[] byteArray) throws ClassNotFoundException, IOException {
 		// TODO https://stackoverflow.com/questions/14669820/how-to-convert-a-string-array-to-a-byte-array-java
 		ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(byteArray);
 		ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream);
 
 		File[] fileArray = (File[]) objectInputStream.readObject(); // instead of String
+
+		objectInputStream.close();
+
+		return fileArray;
+	}
+	
+	public static File deserialiseByteArrayToFile(byte[] byteArray) throws ClassNotFoundException, IOException {
+		// TODO https://stackoverflow.com/questions/14669820/how-to-convert-a-string-array-to-a-byte-array-java
+		ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(byteArray);
+		ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream);
+
+		File fileArray = (File) objectInputStream.readObject(); // instead of String
 
 		objectInputStream.close();
 

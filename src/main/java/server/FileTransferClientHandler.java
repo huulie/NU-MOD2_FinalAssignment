@@ -4,12 +4,18 @@ import java.io.File;
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+
 import exceptions.PacketException;
 import exceptions.UtilByteException;
 import exceptions.UtilDatagramException;
+import helpers.DownloadHelper;
+import helpers.UploadHelper;
 import network.Packet;
 import network.TransportLayer;
 import protocol.FileTransferProtocol;
@@ -43,6 +49,12 @@ public class FileTransferClientHandler implements Runnable {
 	 * TODO
 	 */
 	Path fileStorage;
+	
+	/**
+	 *  List of download, one for each connected downloadHelper. 
+	 *  */
+	private List<UploadHelper> uploads;
+	
 
 	
 	/** The TUI of this FileTransferServer. */
@@ -66,6 +78,8 @@ public class FileTransferClientHandler implements Runnable {
 		this.server = server;
 		this.fileStorage = server.getFileStorage("all"); // TODO for now hardcoded
 
+		this.uploads = new ArrayList<>();
+		
 		this.running = true;
 		this.setClient(initPacket);
 		
@@ -127,8 +141,17 @@ public class FileTransferClientHandler implements Runnable {
 				this.sendBytesToClient(this.listFiles());
 				break;
 
-			case FileTransferProtocol.DOWNLOAD_SINGLE:
-				// do something
+			case FileTransferProtocol.DOWNLOAD:
+			try {
+				File fileToUpload = util.Bytes.deserialiseByteArrayToFile(request[1].getBytes());
+				
+				int downloaderPort = util.Bytes.byteArray2int(request[2].getBytes());
+				this.downloadSingle(fileToUpload,downloaderPort);
+			} catch (ClassNotFoundException | IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+				
 				break;
 
 			default:
@@ -182,8 +205,30 @@ public class FileTransferClientHandler implements Runnable {
 		//return "List of all files -to implement-";
 	}
 	
-	public String downloadSingle() {
-		return "Single file download -to implement-";
+	public void downloadSingle(File fileToUpload, int downloaderPort) {
+		// create uploader helper with file and port from request
+		
+		DatagramSocket uploadSocket;
+		try {
+			uploadSocket = TransportLayer.openNewDatagramSocket();
+		
+		int fileSizeToUpload = (int) fileToUpload.length(); // TODO casting long to int!
+		
+		UploadHelper uploadHelper = new UploadHelper(this, uploadSocket, 
+				this.clientAddress, downloaderPort, fileSizeToUpload, fileToUpload);
+		
+		this.uploads.add(uploadHelper);
+				
+		// start upload helper
+		new Thread(uploadHelper).start();
+
+		
+		
+		} catch (SocketException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		//return "Single file download -to implement-";
 		
 	}
 	

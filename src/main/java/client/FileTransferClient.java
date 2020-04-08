@@ -9,17 +9,21 @@ import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import UI.TUICommands;
 import exceptions.ExitProgram;
 import exceptions.PacketException;
 import exceptions.UtilByteException;
 import exceptions.UtilDatagramException;
+import helpers.DownloadHelper;
 import network.NetworkLayer;
 import network.Packet;
 import network.TransportLayer;
 import protocol.FileTransferProtocol;
+import server.FileTransferClientHandler;
 
 public class FileTransferClient {
 
@@ -63,6 +67,17 @@ public class FileTransferClient {
 	Path fileStorage;
 	String fileStorageDirName;
 	
+	/*
+	 * TODO
+	 */
+	File[] serverFiles;
+	
+	
+	/**
+	 *  List of download, one for each connected downloadHelper. 
+	 *  */
+	private List<DownloadHelper> downloads;
+	
 	boolean running;
 
 	
@@ -79,6 +94,8 @@ public class FileTransferClient {
 		this.ownPort = port;
 		
 		this.sessionActive = false; // TODO may become int to support multiple sessions for one client? 
+		
+		this.downloads = new ArrayList<>();
 
 		// Do setup
 		boolean setupSucces = false;
@@ -220,11 +237,14 @@ public class FileTransferClient {
 		try {
 			switch (command) {
 				case "start session":
-					TUI.showMessage("Initiating session with server...");
-					while (!this.requestSession()) { // TODO clear?
-						TUI.getBoolean("Try again?");
+					if(!this.sessionActive) {
+						TUI.showMessage("Initiating session with server...");
+						while (!this.requestSession()) { // TODO clear?
+							TUI.getBoolean("Try again?");
+						}
+					} else {
+						TUI.showMessage("Session is already active");
 					}
-
 					break;	
 
 				case FileTransferProtocol.LIST_FILES:
@@ -235,7 +255,12 @@ public class FileTransferClient {
 					break;
 
 				case FileTransferProtocol.DOWNLOAD_SINGLE:
-					// do something
+					int indexToDownload = TUI.getInt("Which index to download?");
+					File fileToDownload = this.serverFiles[indexToDownload];
+					
+					if (!this.downloadSingleFile(fileToDownload)) { // TODO clear?
+						TUI.showError("Downloading file failed");
+					}
 					break;
 
 				case TUICommands.EXIT:
@@ -298,16 +323,87 @@ public class FileTransferClient {
 		TUI.showMessage("Server response received, now processing...");
 
 		try {
-			fileArray = util.Bytes.deserialiseByteArrayTofileArray(responseBytes);
+			fileArray = util.Bytes.deserialiseByteArrayToFileArray(responseBytes);
 		} catch (ClassNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-
+		this.serverFiles = fileArray;
 		TUI.showMessage("LIST OF FILES: \n" + Arrays.toString(fileArray));
 		succes = true;
 		
 		return succes;
+	}
+	
+	/**
+	 * TODO
+	 * @param fileToDownload TODO: NOTE this is file as on server, not as to write on client!
+	 * @return
+	 */
+	public boolean downloadSingleFile(File fileToDownload) {
+		boolean succes = false;
+		TUI.showMessage("WARNING: overwriting existing files!"); // TODO
+		try {
+			// create downloadHandler
+			File fileToWrite = new File(this.fileStorage.toString() +
+					File.pathSeparator + fileToDownload.getName());
+			int fileSizeToDownload = (int) fileToDownload.length(); // TODO casting long to int!
+			DatagramSocket downloadSocket = TransportLayer.openNewDatagramSocket();
+			
+			DownloadHelper downloadHelper = new DownloadHelper(this,
+					downloadSocket, this.serverAddress, -1, fileSizeToDownload, fileToWrite);
+			// TODO uploaderPort still to set
+			this.downloads.add(downloadHelper);
+
+			// TODO request file, provide downloaderHelper port
+			byte[] singleFileRequest = util.Bytes.concatArray(FileTransferProtocol.DOWNLOAD.getBytes(),
+					FileTransferProtocol.DELIMITER.getBytes(),
+					util.Bytes.serialiseObjectToByteArray(fileToDownload),
+					FileTransferProtocol.DELIMITER.getBytes(),
+					util.Bytes.int2ByteArray(downloadSocket.getLocalPort())); // TODO ask to helper/
+			this.sendBytesToServer(singleFileRequest);
+
+			// TODO now wait for response, with uploadHelper port
+			TUI.showMessage("Waiting for server response...");
+			Packet receivedPacket = TransportLayer.receivePacket(this.socket);
+			
+			String responseString = receivedPacket.getPayloadAsString();
+			String[] responseSplit = this.getArguments(responseString);
+			
+			if (Arrays.equals(responseSplit[0].getBytes(), FileTransferProtocol.UPLOAD.getBytes())) {
+				downloadHelper.setUploaderPort(Integer.parseInt(responseSplit[2])); // TODO keep protocol in mind!
+				TUI.showMessage("Uploader is on server port = " + Integer.parseInt(responseSplit[2])); //TODO efficiency
+				succes = true;
+			} else {
+				TUI.showError("Invalid response to download request");
+				succes = false;
+			}
+
+			// TODO now everything is known: start download helper
+			new Thread(downloadHelper).start();
+
+		} catch (SocketException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (UtilByteException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (PacketException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (UtilDatagramException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		// TODO actual downloading of file takes place in helper
+//		succes = true;
+				
+		return succes;
+
 	}
 	
 	public void sendBytesToServer(byte[] bytesToSend) { // TODO put in seperate utility?

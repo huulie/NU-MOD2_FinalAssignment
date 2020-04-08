@@ -48,6 +48,22 @@ public class FileTransferProtocol {
 	public static final String DOWNLOAD_SINGLE = "downSingle";
 	
 	/**
+	 * TODO download: file; dowloadHelper port 
+	 */
+	public static final String DOWNLOAD = "DOWNLOAD";
+	
+	/**
+	 * TODO upload: file; uploadHelper port 
+	 */
+	public static final String UPLOAD = "UPLOAD";
+	
+	/**
+	 * TODO .
+	 */
+	public static final byte[] START_DOWNLOAD = "START".getBytes(); 
+	
+	
+	/**
 	 * TODO
 	 */
 	// PACKET DATA FORMAT: header (x bytes) + payload (maximum size: PACKET_SIZE - x bytes)
