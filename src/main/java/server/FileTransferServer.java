@@ -1,15 +1,20 @@
 package server;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 import exceptions.PacketException;
+import exceptions.UtilByteException;
 import exceptions.UtilDatagramException;
 import network.NetworkLayer;
 import network.Packet;
@@ -39,7 +44,14 @@ public class FileTransferServer implements Runnable {
 
 	/** Network info for server. */
 	InetAddress ownAddress = null;
-	int port = 0;
+	int ownPort = 0;
+	
+	/**
+	 * TODO
+	 */
+	Path root;
+	Path fileStorage;
+	String fileStorageDirName;
 
 	// TODO: same as example, because interrupt thread? 	
 	boolean running;
@@ -51,7 +63,7 @@ public class FileTransferServer implements Runnable {
 	 */
 	public FileTransferServer(int port) {
 		// Initialise instance variables:
-		this.port = port;
+		this.ownPort = port;
 		this.running = true;
 
 		this.clients = new ArrayList<>();
@@ -59,6 +71,8 @@ public class FileTransferServer implements Runnable {
 		this.clientsWaitingList = new ArrayList<>();
 
 		this.TUI = new UI.TUI();
+		
+		this.fileStorageDirName = "FTSstorage";
 
 		// Do setup
 		boolean setupSucces = false;
@@ -94,7 +108,7 @@ public class FileTransferServer implements Runnable {
 			//port = TUI.getInt("Please enter the server port.");
 
 			try {
-				this.socket = TransportLayer.openNewDatagramSocket(this.port);
+				this.socket = TransportLayer.openNewDatagramSocket(this.ownPort);
 			} catch (SocketException e) {
 				TUI.showMessage("Something went wrong when opening the socket: "
 						+ e.getLocalizedMessage());
@@ -104,7 +118,7 @@ public class FileTransferServer implements Runnable {
 				}
 			}
 		}
-		TUI.showMessage("Server now bound to port " + port);
+		TUI.showMessage("Server now bound to port " + ownPort);
 		success = true;
 
 		try {
@@ -113,6 +127,35 @@ public class FileTransferServer implements Runnable {
 		} catch (UnknownHostException e) {
 			TUI.showMessage("Could not determine own address: " + e.getLocalizedMessage());
 		} 
+		
+		this.root = Paths.get("").toAbsolutePath(); // TODO suitable method? https://www.baeldung.com/java-current-directory
+		TUI.showMessage("Server root path set to: " + this.root.toString());
+		
+		this.fileStorage = root.resolve(fileStorageDirName);
+		TUI.showMessage("File storage set to: " + this.fileStorage.toString());
+		
+		// TODO: use file or Files
+//		File dir = new File(fileStorageDirName);
+//	    if (dir.mkdirs() ){ // TODO !dir.exists()
+//	    	TUI.showMessage("File storage directory did not exist: created " + fileStorageDirName + " in server root"); 
+//	    } else {
+//	    	TUI.showMessage("File storage directory already exist: not doing anything with " + fileStorageDirName + " in server root"); 
+//	    }
+		
+//		if (!Files.exists(fileStorage)) { // TODO: use if or catch exception
+            try {
+				Files.createDirectory(fileStorage);
+		    	TUI.showMessage("File storage directory did not exist: created " + fileStorageDirName + " in server root"); 
+            } catch(java.nio.file.FileAlreadyExistsException eExist) {
+            	TUI.showMessage("File storage directory already exist: not doing anything with " + fileStorageDirName + " in server root");
+            } catch (IOException e) {
+				// TODO Auto-generated catch block
+				TUI.showError("Failed to create file storage: server CRASHED because " + e.getLocalizedMessage());
+				e.printStackTrace();
+			}
+//        } else {
+//	    	TUI.showMessage("File storage directory already exist: not doing anything with " + fileStorageDirName + " in server root"); 
+//        }
 
 		TUI.showMessage("Setup complete!");
 		return success;
@@ -179,9 +222,15 @@ public class FileTransferServer implements Runnable {
 		try {
 			DatagramSocket sessionSocket = TransportLayer.openNewDatagramSocket(); 
 			FileTransferClientHandler handler = new FileTransferClientHandler(sessionSocket,
-					sessionInitPacket); //TODO (sock, this, name);
+					sessionInitPacket, this); //TODO (sock, this, name);
+
 			new Thread(handler).start();
 			clients.add(handler);
+			
+			int sessionPortNumber = handler.getPort();
+			byte[] initResponse = util.Bytes.concatArray(FileTransferProtocol.INIT_SESSION,
+					(FileTransferProtocol.DELIMITER + sessionPortNumber).getBytes());
+			this.sendBytesToClient(initResponse, sessionInitPacket.getSourceAddress(), sessionInitPacket.getSourcePort());
 
 			TUI.showMessage("New client [" + name + "] connected, on port " 
 					+ handler.getPort() + " !"); 
@@ -202,6 +251,7 @@ public class FileTransferServer implements Runnable {
 		if (this.clientsWaitingList.contains(client)) {
 			this.clientsWaitingList.remove(client);
 		}
+		// TODO remove client after certain silent time
 	}
 	
 	/**
@@ -223,6 +273,57 @@ public class FileTransferServer implements Runnable {
 	 */
 	public String getServerName() {
 		return SERVERNAME;
+	}
+	
+	/**
+	 * TODO return fileStorage path of this server
+	 * TODO maybe create substorage per client?
+	 */
+	public Path getFileStorage(String clientName) {
+		Path clientFileStorage;
+
+		if (clientName.equals("all")) {
+			clientFileStorage = this.fileStorage;
+		} else { 
+			//		clientFileStorage = clientStorage // TODO implement as key-value pairs
+			clientFileStorage = null;
+		}
+
+		return clientFileStorage;
+	}
+	
+	public void sendBytesToClient(byte[] bytesToSend, InetAddress clientAddress, int clientPort) { // TODO put in separate utility?
+		try { // to construct and send a packet
+			Packet packet = new Packet(
+						0, // TODO id
+						this.ownAddress,
+						this.ownPort, 
+						clientAddress, 
+						clientPort,
+						bytesToSend
+				);
+			
+			TransportLayer.sendPacket(
+					this.socket,
+					packet,
+					clientPort
+			); 
+			
+			TUI.showMessage("Bytes send!");
+			
+		} catch (UnknownHostException | PacketException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (UtilByteException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (UtilDatagramException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 
 	// ------------------ Main --------------------------

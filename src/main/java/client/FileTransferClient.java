@@ -1,6 +1,9 @@
 package client;
 
+import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
@@ -125,6 +128,7 @@ public class FileTransferClient {
 		try {
 			this.ownAddress = NetworkLayer.getOwnAddress(); // TODO replace by discover?
 			TUI.showMessage("Client listing on: " + this.ownAddress);
+			TUI.showMessage("NOTE: depending on detection method, this may NOT be the actual interface used");
 		} catch (UnknownHostException e) {
 			TUI.showMessage("Could not determine own address: " + e.getLocalizedMessage());
 		} 
@@ -137,7 +141,8 @@ public class FileTransferClient {
 	
 	public void setServer() { //(InetAddress serverAdress, int serverPort) {
 		try {
-			this.serverAddress = NetworkLayer.getAdressByName("nu-pi-huub"); //("nvc4122.nedap.local");
+//			this.serverAddress = NetworkLayer.getAdressByName("nvc4122.nedap.local");
+			this.serverAddress = NetworkLayer.getAdressByName("nu-pi-huub");
 		} catch (UnknownHostException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -162,25 +167,48 @@ public class FileTransferClient {
 
 		try {
 			switch (command) {
-			case "start session":
-				// do something
-				TUI.showMessage("Initiating session with server...");
-					while(this.requestSession() == false) {
+				case "start session":
+					TUI.showMessage("Initiating session with server...");
+					while (this.requestSession() == false) {
 						TUI.getBoolean("Try again?");
 					}
-				
-				break;	
-			
-			case FileTransferProtocol.LIST_FILES:
+
+					break;	
+
+				case FileTransferProtocol.LIST_FILES:
 					// do something
 					this.sendBytesToServer(FileTransferProtocol.LIST_FILES.getBytes());
-					TUI.showMessage("Sending list of files to client...");
+					TUI.showMessage("Requesting list of files...");
+
+					File[] fileArray = null; // String[]
+
+					TUI.showMessage("Waiting for server response...");
+					Packet receivedPacket = TransportLayer.receivePacket(this.socket);
+					byte[] responseBytes = receivedPacket.getPayload();
+					TUI.showMessage("Server response received, now processing...");
+
+					// TODO https://stackoverflow.com/questions/14669820/how-to-convert-a-string-array-to-a-byte-array-java
+					ByteArrayInputStream byteArrayInputStream =
+							new ByteArrayInputStream(responseBytes);
+					final ObjectInputStream objectInputStream =
+							new ObjectInputStream(byteArrayInputStream);
+
+					try {
+						fileArray = (File[]) objectInputStream.readObject(); // instead of String
+					} catch (ClassNotFoundException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+
+					objectInputStream.close();
+
+					TUI.showMessage("LIST OF FILES: \n" + Arrays.toString(fileArray));
 					break;
-				
+
 				case FileTransferProtocol.DOWNLOAD_SINGLE:
 					// do something
 					break;
-					
+
 				case TUICommands.EXIT:
 					// do something
 					this.shutdown();
@@ -189,10 +217,10 @@ public class FileTransferClient {
 				default:
 					TUI.showError("Unknow command received"); // what TODO with it?
 			}
-			} catch (IOException | PacketException | UtilDatagramException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+		} catch (IOException | PacketException | UtilDatagramException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		TUI.showMessage("... done!");
 	}
 	
@@ -204,18 +232,25 @@ public class FileTransferClient {
 	public boolean requestSession() throws IOException, PacketException, UtilDatagramException {
 		this.sendBytesToServer(FileTransferProtocol.INIT_SESSION);
 		
+		TUI.showMessage("Waiting for server response...");
 		Packet receivedPacket = TransportLayer.receivePacket(this.socket);
-		byte[] responseBytes = receivedPacket.getPayload(); 
+		//byte[] responseBytes = receivedPacket.getPayload(); 
 		
-		if(Arrays.equals(responseBytes,(FileTransferProtocol.INIT_SESSION))) {
+		String responseString = util.PacketUtil.convertPayloadtoString(receivedPacket);
+		String[] responseSplit = this.getArguments(responseString);
+		
+//		if (Arrays.equals(responseBytes, FileTransferProtocol.INIT_SESSION)) {
+		if (Arrays.equals(responseSplit[0].getBytes(), FileTransferProtocol.INIT_SESSION)) {
 			// TODO note: different from .equals() for strings!
 			this.sessionActive = true;
-			this.serverPort = receivedPacket.getSourcePort(); // update to clientHandler
+//			this.serverPort = receivedPacket.getSourcePort(); // update to clientHandler
+			this.serverPort =  Integer.parseInt(responseSplit[1]); // update to clientHandler
 			TUI.showMessage("Session started with server port = " + this.serverPort);
 			return true;
 		} else {
 			this.sessionActive = false;
-			TUI.showError("Invalid response to session init");			
+			TUI.showError("Invalid response to session init");
+			this.sessionActive = false;
 		}
 		return this.sessionActive;
 	}

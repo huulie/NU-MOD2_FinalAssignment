@@ -35,7 +35,7 @@ public class TransportLayer {
         DatagramPacket datagram = new DatagramPacket(buffer, buffer.length);
         socket.receive(datagram);
         
-        return util.Datagram.createPacketFromDatagram(datagram,socket);
+        return util.Datagram.createPacketFromDatagram(datagram, socket);
 	}
 	
 }

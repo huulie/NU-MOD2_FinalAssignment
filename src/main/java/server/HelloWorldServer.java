@@ -28,7 +28,7 @@ public class HelloWorldServer {
 	
 	/**
 	 * TODO
-	 * @param port
+	 * @param ownPort
 	 * @throws SocketException
 	 */
 	public static void main(String[] args) {
