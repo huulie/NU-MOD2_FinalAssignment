@@ -1,19 +1,12 @@
 package server;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.ObjectOutputStream;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Arrays;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 import exceptions.PacketException;
 import exceptions.UtilByteException;
 import exceptions.UtilDatagramException;
@@ -74,7 +67,7 @@ public class FileTransferClientHandler implements Runnable {
 		this.fileStorage = server.getFileStorage("all"); // TODO for now hardcoded
 
 		this.running = true;
-		this.notifyclient(initPacket);
+		this.setClient(initPacket);
 		
 		TUI.showMessage("Listening for client requests...");
 		
@@ -83,14 +76,11 @@ public class FileTransferClientHandler implements Runnable {
 
 	}
 	
-	public void notifyclient(Packet initPacket) {
+	public void setClient(Packet initPacket) {
 		this.clientAddress = initPacket.getSourceAddress();
 		this.clientPort = initPacket.getSourcePort();
 		
-		TUI.showMessage("Notifying client of session port... ");
-//		this.sendBytesToClient(FileTransferProtocol.INIT_SESSION);
-//		TUI.showMessage("Notification send!");
-		TUI.showMessage("Already done by server!");
+		TUI.showMessage("Set client information in handler: done ");
 	}
 	
 	/**
@@ -115,7 +105,7 @@ public class FileTransferClientHandler implements Runnable {
 			TUI.showError("Not going to process it: trying to receive a new packet");
 		} else {
 			TUI.showMessage("Received a packet: going to process it...");
-			String receivedString = util.PacketUtil.convertPayloadtoString(receivedPacket);
+			String receivedString = receivedPacket.getPayloadAsString();
 			this.processRequest(receivedString);
 		}
 	}
@@ -157,6 +147,9 @@ public class FileTransferClientHandler implements Runnable {
 	}
 	
 	public byte[] listFiles() {
+		
+		// TODO: store this info in clientHandler?!! (aks to request update if changed since last time)
+
 		TUI.showMessage("Creating list of files in current directory..");
 		// https://www.baeldung.com/java-list-directory-files
 		int depth = 1;
@@ -178,14 +171,7 @@ public class FileTransferClientHandler implements Runnable {
 	        System.out.println(Arrays.toString(filesArray));
 	     // https://stackoverflow.com/questions/14669820/how-to-convert-a-string-array-to-a-byte-array-java
 			try {
-	        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-			ObjectOutputStream objectOutputStream =
-			    new ObjectOutputStream(byteArrayOutputStream);
-			objectOutputStream.writeObject(filesArray);
-			objectOutputStream.flush();
-			objectOutputStream.close();
-
-			filesByteArray = byteArrayOutputStream.toByteArray();
+	       	filesByteArray = util.Bytes.serialiseObjectToByteArray(filesArray);
 	          
 	    } catch (IOException e) {
 			// TODO Auto-generated catch block

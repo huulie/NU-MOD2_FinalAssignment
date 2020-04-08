@@ -1,9 +1,7 @@
 package client;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.ObjectInputStream;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
@@ -11,6 +9,7 @@ import java.net.UnknownHostException;
 import java.util.Arrays;
 
 import UI.TUICommands;
+import exceptions.ExitProgram;
 import exceptions.PacketException;
 import exceptions.UtilByteException;
 import exceptions.UtilDatagramException;
@@ -107,12 +106,32 @@ public class FileTransferClient {
 		// First, initialise the Server.
 		// SERVERNAME = TUI.getString("What is the name of this server?"); // TODO name? 
 
+		boolean successFileSystem = true; // TODO this.setupFileSystem();
+		boolean succesSocket = this.setupSocket();
+		this.setupOwnAddress();
+		boolean succesServer = this.setServer();
+
+		success = successFileSystem && succesSocket && succesServer;
+		
+		if (success) {
+			TUI.showMessage("Setup complete!");
+		}
+		
+		TUI.showMessage("Setup complete!");
+		return success;
+	}
+	
+	public boolean setupSocket() throws ExitProgram {
+		boolean success = false;
+		
 		TUI.showMessage("Trying to open a new socket...");
 		while (this.socket == null) { // TODO: ask for server port?
 			//port = TUI.getInt("Please enter the server port.");
 
 			try {
 				this.socket = TransportLayer.openNewDatagramSocket(this.ownPort);
+				TUI.showMessage("Client now bound to port " + ownPort);
+				success = true;
 			} catch (SocketException e) {
 				TUI.showError("Something went wrong when opening the socket: "
 						+ e.getLocalizedMessage());
@@ -122,9 +141,10 @@ public class FileTransferClient {
 				}
 			}
 		}
-		TUI.showMessage("Client now bound to port " + ownPort);
-		success = true;
-
+		return success;
+	}
+	
+	public void setupOwnAddress() {
 		try {
 			this.ownAddress = NetworkLayer.getOwnAddress(); // TODO replace by discover?
 			TUI.showMessage("Client listing on: " + this.ownAddress);
@@ -132,22 +152,22 @@ public class FileTransferClient {
 		} catch (UnknownHostException e) {
 			TUI.showMessage("Could not determine own address: " + e.getLocalizedMessage());
 		} 
-
-		this.setServer();
-		
-		TUI.showMessage("Setup complete!");
-		return success;
 	}
 	
-	public void setServer() { //(InetAddress serverAdress, int serverPort) {
+	public boolean setServer() { //(InetAddress serverAdress, int serverPort) {
+		boolean success = false;
+		
 		try {
 //			this.serverAddress = NetworkLayer.getAdressByName("nvc4122.nedap.local");
 			this.serverAddress = NetworkLayer.getAdressByName("nu-pi-huub");
+			success = true;
 		} catch (UnknownHostException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} 
 		this.serverPort = FileTransferProtocol.DEFAULT_SERVER_PORT;
+		
+		return success;
 	}
 	
 	
@@ -155,8 +175,8 @@ public class FileTransferClient {
 
 	public void clientRunning() {
 		while (this.running) {
-		String userInputString = TUI.getString("Please input:");
-		this.processUserInput(userInputString);
+			String userInputString = TUI.getString("Please input:");
+			this.processUserInput(userInputString);
 		}
 	}
 	
@@ -169,40 +189,17 @@ public class FileTransferClient {
 			switch (command) {
 				case "start session":
 					TUI.showMessage("Initiating session with server...");
-					while (this.requestSession() == false) {
+					while (!this.requestSession()) { // TODO clear?
 						TUI.getBoolean("Try again?");
 					}
 
 					break;	
 
 				case FileTransferProtocol.LIST_FILES:
-					// do something
-					this.sendBytesToServer(FileTransferProtocol.LIST_FILES.getBytes());
 					TUI.showMessage("Requesting list of files...");
-
-					File[] fileArray = null; // String[]
-
-					TUI.showMessage("Waiting for server response...");
-					Packet receivedPacket = TransportLayer.receivePacket(this.socket);
-					byte[] responseBytes = receivedPacket.getPayload();
-					TUI.showMessage("Server response received, now processing...");
-
-					// TODO https://stackoverflow.com/questions/14669820/how-to-convert-a-string-array-to-a-byte-array-java
-					ByteArrayInputStream byteArrayInputStream =
-							new ByteArrayInputStream(responseBytes);
-					final ObjectInputStream objectInputStream =
-							new ObjectInputStream(byteArrayInputStream);
-
-					try {
-						fileArray = (File[]) objectInputStream.readObject(); // instead of String
-					} catch (ClassNotFoundException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
+					if (!this.requestListFiles()) { // TODO clear?
+						TUI.showError("Retrieving list of files failed");
 					}
-
-					objectInputStream.close();
-
-					TUI.showMessage("LIST OF FILES: \n" + Arrays.toString(fileArray));
 					break;
 
 				case FileTransferProtocol.DOWNLOAD_SINGLE:
@@ -236,7 +233,7 @@ public class FileTransferClient {
 		Packet receivedPacket = TransportLayer.receivePacket(this.socket);
 		//byte[] responseBytes = receivedPacket.getPayload(); 
 		
-		String responseString = util.PacketUtil.convertPayloadtoString(receivedPacket);
+		String responseString = receivedPacket.getPayloadAsString();
 		String[] responseSplit = this.getArguments(responseString);
 		
 //		if (Arrays.equals(responseBytes, FileTransferProtocol.INIT_SESSION)) {
@@ -255,7 +252,31 @@ public class FileTransferClient {
 		return this.sessionActive;
 	}
 	
-	
+	public boolean requestListFiles() throws IOException, PacketException, UtilDatagramException {
+		// TODO: store this info in client?!!
+		boolean succes = false;
+		
+		this.sendBytesToServer(FileTransferProtocol.LIST_FILES.getBytes());
+
+		File[] fileArray = null; // String[]
+
+		TUI.showMessage("Waiting for server response...");
+		Packet receivedPacket = TransportLayer.receivePacket(this.socket);
+		byte[] responseBytes = receivedPacket.getPayload();
+		TUI.showMessage("Server response received, now processing...");
+
+		try {
+			fileArray = util.Bytes.deserialiseByteArrayTofileArray(responseBytes);
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		TUI.showMessage("LIST OF FILES: \n" + Arrays.toString(fileArray));
+		succes = true;
+		
+		return succes;
+	}
 	
 	public void sendBytesToServer(byte[] bytesToSend) { // TODO put in seperate utility?
 		try { // to construct and send a packet

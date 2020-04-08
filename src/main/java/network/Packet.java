@@ -109,4 +109,13 @@ public class Packet {
 		
 	}
 	
+	/**
+	 * TODO as a sort of "toString", still concerning one packet and placing it here makes naming much easier
+	 * @param 
+	 * @return
+	 */
+	public String getPayloadAsString() {
+		return new String(this.getPayload());
+	}
+	
 }

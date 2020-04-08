@@ -1,5 +1,11 @@
 package util;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
@@ -69,5 +75,28 @@ public class Bytes {
 		}
 		
 		return Arrays.copyOfRange(array, start, last + 1);
+	}
+	
+	public static byte[] serialiseObjectToByteArray(Object object) throws IOException {
+		ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+		ObjectOutputStream objectOutputStream =
+		    new ObjectOutputStream(byteArrayOutputStream);
+		objectOutputStream.writeObject(object);
+		objectOutputStream.flush();
+		objectOutputStream.close();
+
+		return byteArrayOutputStream.toByteArray();
+	}
+	
+	public static File[] deserialiseByteArrayTofileArray(byte[] byteArray) throws ClassNotFoundException, IOException {
+		// TODO https://stackoverflow.com/questions/14669820/how-to-convert-a-string-array-to-a-byte-array-java
+		ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(byteArray);
+		ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream);
+
+		File[] fileArray = (File[]) objectInputStream.readObject(); // instead of String
+
+		objectInputStream.close();
+
+		return fileArray;
 	}
 }

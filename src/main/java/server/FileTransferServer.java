@@ -1,6 +1,5 @@
 package server;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -13,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import exceptions.ExitProgram;
 import exceptions.PacketException;
 import exceptions.UtilByteException;
 import exceptions.UtilDatagramException;
@@ -103,44 +103,27 @@ public class FileTransferServer implements Runnable {
 		// First, initialise the Server.
 		// SERVERNAME = TUI.getString("What is the name of this server?"); // TODO name? 
 
-		TUI.showMessage("Trying to open a new socket...");
-		while (this.socket == null) { // TODO: ask for server port?
-			//port = TUI.getInt("Please enter the server port.");
-
-			try {
-				this.socket = TransportLayer.openNewDatagramSocket(this.ownPort);
-			} catch (SocketException e) {
-				TUI.showMessage("Something went wrong when opening the socket: "
-						+ e.getLocalizedMessage());
-				if (!TUI.getBoolean("Do you want to try again?")) {
-					throw new exceptions.ExitProgram("User indicated to exit the "
-							+ "program after socket opening failure.");
-				}
-			}
-		}
-		TUI.showMessage("Server now bound to port " + ownPort);
-		success = true;
-
-		try {
-			this.ownAddress = NetworkLayer.getOwnAddress(); // TODO replace by discover?
-			TUI.showMessage("Server listing on: " + this.ownAddress);
-		} catch (UnknownHostException e) {
-			TUI.showMessage("Could not determine own address: " + e.getLocalizedMessage());
-		} 
+		boolean successFileSystem = this.setupFileSystem();
+		boolean succesSocket = this.setupSocket();
+		this.setupOwnAddress();
 		
+		success = successFileSystem && succesSocket;
+		
+		if (success) {
+			TUI.showMessage("Setup complete!");
+		}
+		
+		return success;
+	}
+	
+	public boolean setupFileSystem() {
+		boolean success = false;
 		this.root = Paths.get("").toAbsolutePath(); // TODO suitable method? https://www.baeldung.com/java-current-directory
 		TUI.showMessage("Server root path set to: " + this.root.toString());
 		
 		this.fileStorage = root.resolve(fileStorageDirName);
 		TUI.showMessage("File storage set to: " + this.fileStorage.toString());
-		
-		// TODO: use file or Files
-//		File dir = new File(fileStorageDirName);
-//	    if (dir.mkdirs() ){ // TODO !dir.exists()
-//	    	TUI.showMessage("File storage directory did not exist: created " + fileStorageDirName + " in server root"); 
-//	    } else {
-//	    	TUI.showMessage("File storage directory already exist: not doing anything with " + fileStorageDirName + " in server root"); 
-//	    }
+
 		
 //		if (!Files.exists(fileStorage)) { // TODO: use if or catch exception
             try {
@@ -156,12 +139,43 @@ public class FileTransferServer implements Runnable {
 //        } else {
 //	    	TUI.showMessage("File storage directory already exist: not doing anything with " + fileStorageDirName + " in server root"); 
 //        }
-
-		TUI.showMessage("Setup complete!");
-		return success;
+            success = true;
+    		return success;
 	}
 
+	public boolean setupSocket() throws ExitProgram {
+		boolean success = false;
+		TUI.showMessage("Trying to open a new socket...");
+		while (this.socket == null) { // TODO: ask for server port?
+			//port = TUI.getInt("Please enter the server port.");
 
+			try {
+				this.socket = TransportLayer.openNewDatagramSocket(this.ownPort);
+				TUI.showMessage("Server now bound to port " + ownPort);
+				success = true;
+			} catch (SocketException e) {
+				TUI.showMessage("Something went wrong when opening the socket: "
+						+ e.getLocalizedMessage());
+				if (!TUI.getBoolean("Do you want to try again?")) {
+					throw new exceptions.ExitProgram("User indicated to exit the "
+							+ "program after socket opening failure.");
+				}
+			}
+		}
+		
+		return success;
+	}
+	
+	public void setupOwnAddress() {
+		try {
+			this.ownAddress = NetworkLayer.getOwnAddress(); // TODO replace by discover?
+			TUI.showMessage("Server listing on: " + this.ownAddress);
+			TUI.showMessage("NOTE: depending on detection method, this may NOT be the actual interface used");
+		} catch (UnknownHostException e) {
+			TUI.showMessage("Could not determine own address: " + e.getLocalizedMessage());
+		} 
+	}
+	
 	// ------------------ Server Methods --------------------------
 	
 	/**
@@ -186,7 +200,7 @@ public class FileTransferServer implements Runnable {
 					this.handleSessionRequest(receivedPacket);
 				} else {
 					TUI.showError("Unknown packet: dropping");
-					TUI.showError("Content was: : " + util.PacketUtil.convertPayloadtoString(receivedPacket)
+					TUI.showError("Content was: : " + receivedPacket.getPayloadAsString()
 							+ " (in bytes: " + Arrays.toString(receivedPacket.getPayload()) + ")");
 					// TODO send unknown message back? 
 				}
