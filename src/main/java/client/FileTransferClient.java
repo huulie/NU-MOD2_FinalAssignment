@@ -6,6 +6,9 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 
 import UI.TUICommands;
@@ -53,6 +56,13 @@ public class FileTransferClient {
 	/** The TUI of this FileTransferServer. */
 	private UI.TUI TUI; 
 	
+	/**
+	 * TODO
+	 */
+	Path root;
+	Path fileStorage;
+	String fileStorageDirName;
+	
 	boolean running;
 
 	
@@ -63,16 +73,12 @@ public class FileTransferClient {
 	 */
 	public FileTransferClient(int port) {
 		this.TUI = new UI.TUI();
+		
+		this.fileStorageDirName = "FTCstorage";
 
 		this.ownPort = port;
-		try {
-			this.ownAddress = NetworkLayer.getOwnAddress();
-		} catch (UnknownHostException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
 		
-		this.sessionActive = false;
+		this.sessionActive = false; // TODO may become int to support multiple sessions for one client? 
 
 		// Do setup
 		boolean setupSucces = false;
@@ -106,7 +112,7 @@ public class FileTransferClient {
 		// First, initialise the Server.
 		// SERVERNAME = TUI.getString("What is the name of this server?"); // TODO name? 
 
-		boolean successFileSystem = true; // TODO this.setupFileSystem();
+		boolean successFileSystem = this.setupFileSystem();
 		boolean succesSocket = this.setupSocket();
 		this.setupOwnAddress();
 		boolean succesServer = this.setServer();
@@ -118,6 +124,33 @@ public class FileTransferClient {
 		}
 		
 		return success;
+	}
+	
+	public boolean setupFileSystem() {
+		boolean success = false;
+		this.root = Paths.get("").toAbsolutePath(); // TODO suitable method? https://www.baeldung.com/java-current-directory
+		TUI.showMessage("Client root path set to: " + this.root.toString());
+		
+		this.fileStorage = root.resolve(fileStorageDirName);
+		TUI.showMessage("File storage set to: " + this.fileStorage.toString());
+
+		
+//		if (!Files.exists(fileStorage)) { // TODO: use if or catch exception
+            try {
+				Files.createDirectory(fileStorage);
+		    	TUI.showMessage("File storage directory did not exist: created " + fileStorageDirName + " in client root"); 
+            } catch(java.nio.file.FileAlreadyExistsException eExist) {
+            	TUI.showMessage("File storage directory already exist: not doing anything with " + fileStorageDirName + " in client root");
+            } catch (IOException e) {
+				// TODO Auto-generated catch block
+				TUI.showError("Failed to create file storage: server CRASHED because " + e.getLocalizedMessage());
+				e.printStackTrace();
+			}
+//        } else {
+//	    	TUI.showMessage("File storage directory already exist: not doing anything with " + fileStorageDirName + " in client root"); 
+//        }
+            success = true;
+    		return success;
 	}
 	
 	public boolean setupSocket() throws ExitProgram {
