@@ -284,7 +284,8 @@ public class FileTransferClient {
 	}
 	
 	public boolean requestSession() throws IOException, PacketException, UtilDatagramException {
-		this.sendBytesToServer(FileTransferProtocol.INIT_SESSION);
+		this.sendBytesToServer(FileTransferProtocol.INIT_SESSION,
+				0); // TODO make this more nice
 		
 		TUI.showMessage("Waiting for server response...");
 		Packet receivedPacket = TransportLayer.receivePacket(this.socket);
@@ -313,7 +314,8 @@ public class FileTransferClient {
 		// TODO: store this info in client?!!
 		boolean succes = false;
 		
-		this.sendBytesToServer(FileTransferProtocol.LIST_FILES.getBytes());
+		this.sendBytesToServer(FileTransferProtocol.LIST_FILES.getBytes(),
+				FileTransferProtocol.LIST_FILES.getBytes().length-1+1); // TODO make this more nice + note offset is string end +1 BUT length starts from 1
 
 		File[] fileArray = null; // String[]
 
@@ -358,10 +360,13 @@ public class FileTransferClient {
 			// TODO request file, provide downloaderHelper port
 			byte[] singleFileRequest = util.Bytes.concatArray(FileTransferProtocol.DOWNLOAD.getBytes(),
 					FileTransferProtocol.DELIMITER.getBytes(),
-					util.Bytes.int2ByteArray(downloadSocket.getLocalPort()),
-					FileTransferProtocol.DELIMITER.getBytes(),
-					util.Bytes.serialiseObjectToByteArray(fileToDownload)); // TODO ask to helper/
-			this.sendBytesToServer(singleFileRequest);
+					util.Bytes.int2ByteArray(downloadSocket.getLocalPort()), // TODO ask to helper/
+					FileTransferProtocol.DELIMITER.getBytes());
+			
+			byte[] fileToDownloadBytes = util.Bytes.serialiseObjectToByteArray(fileToDownload); 
+			
+			this.sendBytesToServer(util.Bytes.concatArray(singleFileRequest, fileToDownloadBytes),
+					singleFileRequest.length-1 + 1); // TODO make this more nice + note offset is string end +1 (note length starts at 1)
 
 			// TODO now wait for response, with uploadHelper port
 			TUI.showMessage("Waiting for server response...");
@@ -370,17 +375,18 @@ public class FileTransferClient {
 			String responseString = receivedPacket.getPayloadString();
 			String[] responseSplit = this.getArguments(responseString);
 			
-			if (Arrays.equals(responseSplit[0].getBytes(), FileTransferProtocol.UPLOAD.getBytes())) {
+			if (responseSplit[0].contentEquals(FileTransferProtocol.UPLOAD)) {
 				downloadHelper.setUploaderPort(Integer.parseInt(responseSplit[1])); // TODO keep protocol in mind!
 				TUI.showMessage("Uploader is on server port = " + Integer.parseInt(responseSplit[1])); //TODO efficiency
+				
+				// TODO now everything is known: start download helper
+				new Thread(downloadHelper).start();
+				
 				succes = true;
 			} else {
 				TUI.showError("Invalid response to download request");
 				succes = false;
 			}
-
-			// TODO now everything is known: start download helper
-			new Thread(downloadHelper).start();
 
 		} catch (SocketException e) {
 			// TODO Auto-generated catch block
@@ -406,7 +412,7 @@ public class FileTransferClient {
 
 	}
 	
-	public void sendBytesToServer(byte[] bytesToSend) { // TODO put in seperate utility?
+	public void sendBytesToServer(byte[] bytesToSend, int byteOffset) { // TODO put in seperate utility?
 		try { // to construct and send a packet
 			Packet packet = new Packet(
 						0, // TODO id
@@ -414,7 +420,7 @@ public class FileTransferClient {
 						this.ownPort, 
 						this.serverAddress, 
 						this.serverPort,
-						bytesToSend
+						bytesToSend, byteOffset
 				);
 			
 			TransportLayer.sendPacket(

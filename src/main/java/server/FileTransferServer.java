@@ -192,6 +192,7 @@ public class FileTransferServer implements Runnable {
 
 				Packet receivedPacket = TransportLayer.receivePacket(this.socket);
 
+				System.out.println("DEBUG:"); // TODO
 				System.out.println(Arrays.toString(receivedPacket.getPayload())); // TODO payloadBytes?
 				System.out.println(Arrays.toString(FileTransferProtocol.INIT_SESSION));
 
@@ -244,7 +245,10 @@ public class FileTransferServer implements Runnable {
 			int sessionPortNumber = handler.getPort();
 			byte[] initResponse = util.Bytes.concatArray(FileTransferProtocol.INIT_SESSION,
 					(FileTransferProtocol.DELIMITER + sessionPortNumber).getBytes());
-			this.sendBytesToClient(initResponse, sessionInitPacket.getSourceAddress(), sessionInitPacket.getSourcePort());
+			this.sendBytesToClient(initResponse,
+					sessionInitPacket.getSourceAddress(),
+					sessionInitPacket.getSourcePort(),
+					initResponse.length-1+1); // TODO make this more nice + note offset is string end +1 (note length starts at 1)
 
 			TUI.showMessage("New client [" + name + "] connected, on port " 
 					+ handler.getPort() + " !"); 
@@ -306,7 +310,7 @@ public class FileTransferServer implements Runnable {
 		return clientFileStorage;
 	}
 	
-	public void sendBytesToClient(byte[] bytesToSend, InetAddress clientAddress, int clientPort) { // TODO put in separate utility?
+	public void sendBytesToClient(byte[] bytesToSend, InetAddress clientAddress, int clientPort, int byteOffset) { // TODO put in separate utility?
 		try { // to construct and send a packet
 			Packet packet = new Packet(
 						0, // TODO id
@@ -314,7 +318,8 @@ public class FileTransferServer implements Runnable {
 						this.ownPort, 
 						clientAddress, 
 						clientPort,
-						bytesToSend
+						bytesToSend,
+						byteOffset
 				);
 			
 			TransportLayer.sendPacket(

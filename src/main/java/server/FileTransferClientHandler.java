@@ -122,12 +122,14 @@ public class FileTransferClientHandler implements Runnable {
 				TUI.showError("Not going to process it: trying to receive a new packet");
 			} else {
 				TUI.showMessage("Received a packet: going to process it...");
+				TUI.showMessage("Packet payload: " + new String(receivedPacket.getPayload()));
+				
 				String receivedString = receivedPacket.getPayloadString();
 				TUI.showMessage("Received String: " + receivedString);
-				byte[] receivedBytes= receivedPacket.getPayloadBytes();
+				byte[] receivedBytes = receivedPacket.getPayloadBytes();
 				TUI.showMessage("Received bytes: " + receivedString);
 
-				this.processRequest(receivedString , receivedBytes);
+				this.processRequest(receivedString, receivedBytes);
 			}
 		}
 	}
@@ -138,7 +140,7 @@ public class FileTransferClientHandler implements Runnable {
 		// TODO NOT convert from bytes to String and back!
 		//https://stackoverflow.com/questions/22519346/how-to-split-a-byte-array-around-a-byte-sequence-in-java/29084734
 		// https://stackoverflow.com/questions/2758654/conversion-of-byte-into-a-string-and-then-back-to-a-byte
-TUI.showMessage("RequestBytes: " + Arrays.toString(requestBytes));
+		//TUI.showMessage("RequestBytes: " + Arrays.toString(requestBytes));
 		
 		String[] request = this.getArguments(requestString); 
 		TUI.showMessage("Received request: " + Arrays.toString(request));
@@ -153,18 +155,17 @@ TUI.showMessage("RequestBytes: " + Arrays.toString(requestBytes));
 				TUI.showMessage("Client requested list of files...");
 				//String list = this.listFiles();
 				//this.sendBytesToClient(list.getBytes());
-				this.sendBytesToClient(this.listFiles());
+				this.sendBytesToClient(this.listFiles(), 0);
 				break;
 
 			case FileTransferProtocol.DOWNLOAD:
 				TUI.showMessage("Client requested download of single file...");
 				try {
-					byte[] fileObjectBytes = Arrays.copyOfRange(requestBytes,9,97);
-					File fileToUpload = util.Bytes.deserialiseByteArrayToFile(fileObjectBytes); //(request[1].getBytes());
+					File fileToUpload = util.Bytes.deserialiseByteArrayToFile(requestBytes); //(request[1].getBytes());
 					TUI.showMessage("File: " + fileToUpload.getAbsolutePath());
-					int downloaderPort = util.Bytes.byteArray2int(request[2].getBytes());
+					int downloaderPort = util.Bytes.byteArray2int(request[1].getBytes());
 					TUI.showMessage("To downloader on port: " + downloaderPort);
-					this.downloadSingle(fileToUpload,downloaderPort);
+					this.downloadSingle(fileToUpload, downloaderPort);
 				} catch (ClassNotFoundException | IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
@@ -248,12 +249,17 @@ TUI.showMessage("RequestBytes: " + Arrays.toString(requestBytes));
 			new Thread(uploadHelper).start();
 
 			// let downloadHelper know about uploader
-			byte[] singleFileResponse = util.Bytes.concatArray(FileTransferProtocol.DOWNLOAD.getBytes(),
-					FileTransferProtocol.DELIMITER.getBytes(),
-					util.Bytes.serialiseObjectToByteArray(fileToUpload),
-					FileTransferProtocol.DELIMITER.getBytes(),
-					util.Bytes.int2ByteArray(uploadSocket.getLocalPort())); // TODO ask to helper/
-			this.sendBytesToClient(singleFileResponse);
+			byte[] singleFileResponse = (FileTransferProtocol.UPLOAD +
+					FileTransferProtocol.DELIMITER +
+					uploadSocket.getLocalPort() + // TODO ask to helper/?
+					FileTransferProtocol.DELIMITER).getBytes();
+			
+			byte[] fileToUploadBytes = util.Bytes.serialiseObjectToByteArray(fileToUpload);
+			
+			
+					 
+			this.sendBytesToClient(util.Bytes.concatArray(singleFileResponse, fileToUploadBytes),
+					singleFileResponse.length-1 + 1); // TODO make this more nice + note offset is string end +1 (note length starts at 1)
 
 
 		} catch (SocketException e) {
@@ -262,15 +268,11 @@ TUI.showMessage("RequestBytes: " + Arrays.toString(requestBytes));
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		} catch (UtilByteException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		}
-		//return "Single file download -to implement-";
 
 	}
 	
-	public void sendBytesToClient(byte[] bytesToSend) { // TODO put in separate utility?
+	public void sendBytesToClient(byte[] bytesToSend, int byteOffset) { // TODO put in separate utility?
 		try { // to construct and send a packet
 			Packet packet = new Packet(
 						0, // TODO id
@@ -278,7 +280,8 @@ TUI.showMessage("RequestBytes: " + Arrays.toString(requestBytes));
 						this.ownPort, 
 						this.clientAddress, 
 						this.clientPort,
-						bytesToSend
+						bytesToSend,
+						byteOffset
 				);
 			
 			TransportLayer.sendPacket(

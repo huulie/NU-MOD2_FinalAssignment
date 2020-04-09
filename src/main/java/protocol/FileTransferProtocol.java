@@ -89,7 +89,7 @@ public class FileTransferProtocol {
 	 * TODO . 
 	 * NOTE: payload length should be encoded with big-endian encoding
 	 */
-	public static final int HEADER_BYTE_OFFSET_START = HEADER_PAYLOAD_LENGTH_LAST+1;
+	public static final int HEADER_BYTE_OFFSET_START = HEADER_PAYLOAD_LENGTH_LAST + 1;
 	public static final int HEADER_BYTE_OFFSET_LAST = HEADER_BYTE_OFFSET_START 
 			//+ (int) Math.ceil(Math.log(MAX_PACKET_SIZE) / Math.log(2) / 8);
 			+ 3; // TODO the int2Byte always puts in block of 4 bytes 
@@ -100,7 +100,7 @@ public class FileTransferProtocol {
 	 */
 	public static final int TOTAL_HEADER_SIZE = HEADER_BYTE_OFFSET_LAST;
 	
-	public static final int PAYLOAD_START = HEADER_PAYLOAD_LENGTH_LAST + 1;
+	public static final int PAYLOAD_START = TOTAL_HEADER_SIZE + 1;
 	
 
 	

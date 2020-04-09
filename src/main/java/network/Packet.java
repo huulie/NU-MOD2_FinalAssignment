@@ -156,7 +156,8 @@ public class Packet {
 		if (this.byteOffset == 0) {
 			return "";
 		} else {
-			byte[] stringBytes = Arrays.copyOfRange(this.getPayload(), 0, this.byteOffset-1);
+			byte[] stringBytes = Arrays.copyOfRange(this.getPayload(), 0, this.byteOffset);
+			// TODO: not minus one, because to is exclusive
 			return new String(stringBytes);
 		}
 	}
@@ -167,7 +168,12 @@ public class Packet {
 	 * @return
 	 */
 	public byte[] getPayloadBytes() {
-		return Arrays.copyOfRange(this.getPayload(), this.byteOffset, this.payloadLength);
+		if (this.byteOffset > this.payloadLength) {
+			return null;
+		} else {
+			return Arrays.copyOfRange(this.getPayload(), this.byteOffset, this.payloadLength + 1);
+			// TODO note to is exclusive
+		}
 	}
 	
 }
