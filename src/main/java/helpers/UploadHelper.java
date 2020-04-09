@@ -149,7 +149,7 @@ public class UploadHelper implements Runnable {
 				try {
 					Packet receivedPacket = TransportLayer.receivePacket(this.uploadSocket);
 
-					if (Arrays.equals(receivedPacket.getPayload(),FileTransferProtocol.START_DOWNLOAD)) {
+					if (Arrays.equals(receivedPacket.getPayloadBytes(),FileTransferProtocol.START_DOWNLOAD)) {
 						proceed = true;
 					}
 				} catch (IOException | PacketException | UtilDatagramException e) {

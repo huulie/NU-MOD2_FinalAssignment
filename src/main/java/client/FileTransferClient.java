@@ -207,8 +207,8 @@ public class FileTransferClient {
 		boolean success = false;
 		
 		try {
-//			this.serverAddress = NetworkLayer.getAdressByName("nvc4122.nedap.local");
-			this.serverAddress = NetworkLayer.getAdressByName("nu-pi-huub");
+			this.serverAddress = NetworkLayer.getAdressByName("nvc4122.nedap.local");
+//			this.serverAddress = NetworkLayer.getAdressByName("nu-pi-huub");
 			success = true;
 		} catch (UnknownHostException e) {
 			// TODO Auto-generated catch block
@@ -290,7 +290,7 @@ public class FileTransferClient {
 		Packet receivedPacket = TransportLayer.receivePacket(this.socket);
 		//byte[] responseBytes = receivedPacket.getPayload(); 
 		
-		String responseString = receivedPacket.getPayloadAsString();
+		String responseString = receivedPacket.getPayloadString();
 		String[] responseSplit = this.getArguments(responseString);
 		
 //		if (Arrays.equals(responseBytes, FileTransferProtocol.INIT_SESSION)) {
@@ -319,7 +319,7 @@ public class FileTransferClient {
 
 		TUI.showMessage("Waiting for server response...");
 		Packet receivedPacket = TransportLayer.receivePacket(this.socket);
-		byte[] responseBytes = receivedPacket.getPayload();
+		byte[] responseBytes = receivedPacket.getPayloadBytes();
 		TUI.showMessage("Server response received, now processing...");
 
 		try {
@@ -358,21 +358,21 @@ public class FileTransferClient {
 			// TODO request file, provide downloaderHelper port
 			byte[] singleFileRequest = util.Bytes.concatArray(FileTransferProtocol.DOWNLOAD.getBytes(),
 					FileTransferProtocol.DELIMITER.getBytes(),
-					util.Bytes.serialiseObjectToByteArray(fileToDownload),
+					util.Bytes.int2ByteArray(downloadSocket.getLocalPort()),
 					FileTransferProtocol.DELIMITER.getBytes(),
-					util.Bytes.int2ByteArray(downloadSocket.getLocalPort())); // TODO ask to helper/
+					util.Bytes.serialiseObjectToByteArray(fileToDownload)); // TODO ask to helper/
 			this.sendBytesToServer(singleFileRequest);
 
 			// TODO now wait for response, with uploadHelper port
 			TUI.showMessage("Waiting for server response...");
 			Packet receivedPacket = TransportLayer.receivePacket(this.socket);
 			
-			String responseString = receivedPacket.getPayloadAsString();
+			String responseString = receivedPacket.getPayloadString();
 			String[] responseSplit = this.getArguments(responseString);
 			
 			if (Arrays.equals(responseSplit[0].getBytes(), FileTransferProtocol.UPLOAD.getBytes())) {
-				downloadHelper.setUploaderPort(Integer.parseInt(responseSplit[2])); // TODO keep protocol in mind!
-				TUI.showMessage("Uploader is on server port = " + Integer.parseInt(responseSplit[2])); //TODO efficiency
+				downloadHelper.setUploaderPort(Integer.parseInt(responseSplit[1])); // TODO keep protocol in mind!
+				TUI.showMessage("Uploader is on server port = " + Integer.parseInt(responseSplit[1])); //TODO efficiency
 				succes = true;
 			} else {
 				TUI.showError("Invalid response to download request");

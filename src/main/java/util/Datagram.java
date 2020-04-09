@@ -32,6 +32,21 @@ public class Datagram {
 		return payloadLength;
 	}
 	
+	public static int getHeaderByteOffset(byte[] datagram) throws UtilDatagramException {
+		int byteOffset = -1;
+		
+		try {
+			byteOffset = util.Bytes.byteArray2int(util.Bytes.subArray(datagram,
+					FileTransferProtocol.HEADER_BYTE_OFFSET_START,
+					FileTransferProtocol.HEADER_BYTE_OFFSET_LAST));
+		} catch (UtilByteException e) {
+			// TODO Auto-generated catch block
+			throw new UtilDatagramException(e.getLocalizedMessage());
+		}
+		
+		return byteOffset;
+	}
+	
 	public static byte[] getPayload(byte[] datagram, int payloadLength) throws UtilDatagramException {
 		byte[] payload = null; 
 
@@ -74,15 +89,18 @@ public class Datagram {
 	
 	public static byte[] buildHeader(Packet packet) throws UtilDatagramException {
 		// write file size into the header byte 
-		byte[] payloadSizeBytes;
+		byte[] header;
 		try {
-			payloadSizeBytes = util.Bytes.int2ByteArray(packet.getPayloadLength());
+			byte[] payloadSizeBytes = util.Bytes.int2ByteArray(packet.getPayloadLength());
+			byte[] byteOffsetBytes = util.Bytes.int2ByteArray(packet.getByteOffset());
+		
+			header = util.Bytes.concatArray(payloadSizeBytes, byteOffsetBytes);
 		} catch (UtilByteException e) {
 			// TODO Auto-generated catch block
 			throw new UtilDatagramException(e.getLocalizedMessage());
 		}
 
-		byte[] header = payloadSizeBytes;
+		
 
 		return header;
 	}
@@ -105,7 +123,8 @@ public class Datagram {
         
         byte[] data = datagram.getData();
 
-        int payloadLength = util.Datagram.getHeaderPayloadLength(data); 
+        int payloadLength = util.Datagram.getHeaderPayloadLength(data);
+        int byteOffset = util.Datagram.getHeaderByteOffset(data);
         byte[] payload = util.Datagram.getPayload(data, payloadLength);
 		
 		Packet packet = new Packet(
@@ -114,7 +133,8 @@ public class Datagram {
 				datagram.getPort(),
 				receivingSocket.getLocalAddress(), // TODO: assume own address? 
 				receivingSocket.getPort(), // TODO: retains binding to port number, or LOCALport?
-				payload// TODO: remove any padding?! Based on payload length field
+				payload,// TODO: remove any padding?! Based on payload length field
+				byteOffset
 				); // TODO: id, null should be own address / from datagram?
 		
 		return packet;

@@ -192,16 +192,16 @@ public class FileTransferServer implements Runnable {
 
 				Packet receivedPacket = TransportLayer.receivePacket(this.socket);
 
-				System.out.println(Arrays.toString(receivedPacket.getPayload()));
+				System.out.println(Arrays.toString(receivedPacket.getPayload())); // TODO payloadBytes?
 				System.out.println(Arrays.toString(FileTransferProtocol.INIT_SESSION));
 
-				if (Arrays.equals(receivedPacket.getPayload() , (FileTransferProtocol.INIT_SESSION))) { 
+				if (Arrays.equals(receivedPacket.getPayload() , (FileTransferProtocol.INIT_SESSION))) {  // TODO payloadBytes?
 					// TODO note: different from .equals() for strings!
 					this.handleSessionRequest(receivedPacket);
 				} else {
 					TUI.showError("Unknown packet: dropping");
-					TUI.showError("Content was: : " + receivedPacket.getPayloadAsString()
-							+ " (in bytes: " + Arrays.toString(receivedPacket.getPayload()) + ")");
+					TUI.showError("Content was: : " + receivedPacket.getPayloadString()
+							+ " (in bytes: " + Arrays.toString(receivedPacket.getPayload()) + ")"); //TODO no payloadBytes
 					// TODO send unknown message back? 
 				}
 

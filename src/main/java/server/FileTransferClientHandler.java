@@ -1,6 +1,7 @@
 package server;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -83,7 +84,6 @@ public class FileTransferClientHandler implements Runnable {
 		this.running = true;
 		this.setClient(initPacket);
 		
-		TUI.showMessage("Listening for client requests...");
 		
 		// TODO add setName for handler, and then printWithPrefix
 		
@@ -103,31 +103,46 @@ public class FileTransferClientHandler implements Runnable {
 	public void run() { //receiveRequest() {
 		// receive
 		
-		Packet receivedPacket = null;
-		
-		try {
-			receivedPacket = TransportLayer.receivePacket(this.socket);
-		} catch (IOException | PacketException | UtilDatagramException e) {
-			// TODO Auto-generated catch block
-			TUI.showError("Someting went wrong with recieving a packet!");
-			TUI.showError("Not going to process it: trying to receive a new packet");
-			//e.printStackTrace();
-		}
+		while(running) { // keep listening
+			Packet receivedPacket = null;
 
-		if (receivedPacket == null) {
-			TUI.showError("Someting went wrong with recieving a packet!");
-			TUI.showError("Not going to process it: trying to receive a new packet");
-		} else {
-			TUI.showMessage("Received a packet: going to process it...");
-			String receivedString = receivedPacket.getPayloadAsString();
-			this.processRequest(receivedString);
+			TUI.showMessage("Listening for client requests...");
+
+			try {
+				receivedPacket = TransportLayer.receivePacket(this.socket);
+			} catch (IOException | PacketException | UtilDatagramException e) {
+				// TODO Auto-generated catch block
+				TUI.showError("Someting went wrong with recieving a packet!");
+				TUI.showError("Not going to process it: trying to receive a new packet");
+				//e.printStackTrace();
+			}
+
+			if (receivedPacket == null) {
+				TUI.showError("Someting went wrong with recieving a packet!");
+				TUI.showError("Not going to process it: trying to receive a new packet");
+			} else {
+				TUI.showMessage("Received a packet: going to process it...");
+				String receivedString = receivedPacket.getPayloadString();
+				TUI.showMessage("Received String: " + receivedString);
+				byte[] receivedBytes= receivedPacket.getPayloadBytes();
+				TUI.showMessage("Received bytes: " + receivedString);
+
+				this.processRequest(receivedString , receivedBytes);
+			}
 		}
 	}
 
 	
-	public void processRequest(String requestString) {
-
+	public void processRequest(String requestString, byte[] requestBytes) {
+		
+		// TODO NOT convert from bytes to String and back!
+		//https://stackoverflow.com/questions/22519346/how-to-split-a-byte-array-around-a-byte-sequence-in-java/29084734
+		// https://stackoverflow.com/questions/2758654/conversion-of-byte-into-a-string-and-then-back-to-a-byte
+TUI.showMessage("RequestBytes: " + Arrays.toString(requestBytes));
+		
 		String[] request = this.getArguments(requestString); 
+		TUI.showMessage("Received request: " + Arrays.toString(request));
+		
 		String command = request[0]; //.charAt(0); // TODO or String?
 		// TODO check string being null, to prevent nullpointer exception?!
 
@@ -142,15 +157,18 @@ public class FileTransferClientHandler implements Runnable {
 				break;
 
 			case FileTransferProtocol.DOWNLOAD:
-			try {
-				File fileToUpload = util.Bytes.deserialiseByteArrayToFile(request[1].getBytes());
-				
-				int downloaderPort = util.Bytes.byteArray2int(request[2].getBytes());
-				this.downloadSingle(fileToUpload,downloaderPort);
-			} catch (ClassNotFoundException | IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+				TUI.showMessage("Client requested download of single file...");
+				try {
+					byte[] fileObjectBytes = Arrays.copyOfRange(requestBytes,9,97);
+					File fileToUpload = util.Bytes.deserialiseByteArrayToFile(fileObjectBytes); //(request[1].getBytes());
+					TUI.showMessage("File: " + fileToUpload.getAbsolutePath());
+					int downloaderPort = util.Bytes.byteArray2int(request[2].getBytes());
+					TUI.showMessage("To downloader on port: " + downloaderPort);
+					this.downloadSingle(fileToUpload,downloaderPort);
+				} catch (ClassNotFoundException | IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 				
 				break;
 
@@ -188,8 +206,15 @@ public class FileTransferClientHandler implements Runnable {
 //	          .collect(Collectors.toSet()); // this returns Set<String> if returning stream
 //	          
 //	        String[]  filesArray = stream.toArray();//stream.toArray(String[]::new);
+		// TODO do without files?
 	        
-		File[] filesArray = new File(this.fileStorage.toString()).listFiles(); // TODO do without files?
+		File[] filesArray = new File(this.fileStorage.toString()).listFiles( // TODO only non-hidden
+				new FileFilter() {
+					@Override
+					public boolean accept(File file) {
+						return !file.isHidden();
+					}
+				});
 
 	        System.out.println(Arrays.toString(filesArray));
 	     // https://stackoverflow.com/questions/14669820/how-to-convert-a-string-array-to-a-byte-array-java
@@ -211,25 +236,38 @@ public class FileTransferClientHandler implements Runnable {
 		DatagramSocket uploadSocket;
 		try {
 			uploadSocket = TransportLayer.openNewDatagramSocket();
-		
-		int fileSizeToUpload = (int) fileToUpload.length(); // TODO casting long to int!
-		
-		UploadHelper uploadHelper = new UploadHelper(this, uploadSocket, 
-				this.clientAddress, downloaderPort, fileSizeToUpload, fileToUpload);
-		
-		this.uploads.add(uploadHelper);
-				
-		// start upload helper
-		new Thread(uploadHelper).start();
 
-		
-		
+			int fileSizeToUpload = (int) fileToUpload.length(); // TODO casting long to int!
+
+			UploadHelper uploadHelper = new UploadHelper(this, uploadSocket, 
+					this.clientAddress, downloaderPort, fileSizeToUpload, fileToUpload);
+
+			this.uploads.add(uploadHelper);
+
+			// start upload helper
+			new Thread(uploadHelper).start();
+
+			// let downloadHelper know about uploader
+			byte[] singleFileResponse = util.Bytes.concatArray(FileTransferProtocol.DOWNLOAD.getBytes(),
+					FileTransferProtocol.DELIMITER.getBytes(),
+					util.Bytes.serialiseObjectToByteArray(fileToUpload),
+					FileTransferProtocol.DELIMITER.getBytes(),
+					util.Bytes.int2ByteArray(uploadSocket.getLocalPort())); // TODO ask to helper/
+			this.sendBytesToClient(singleFileResponse);
+
+
 		} catch (SocketException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (UtilByteException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		//return "Single file download -to implement-";
-		
+
 	}
 	
 	public void sendBytesToClient(byte[] bytesToSend) { // TODO put in separate utility?

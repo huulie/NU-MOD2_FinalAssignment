@@ -191,7 +191,7 @@ public class DownloadHelper implements Runnable {
 			int oldlength=fileContents.length;
 			int datalen= packet.getPayloadLength();; //packet.length - HEADERSIZE;
 			fileContents = Arrays.copyOf(fileContents, oldlength+datalen);
-			System.arraycopy(packet.getPayload(), 0, fileContents, oldlength, datalen); // start at beginning payload
+			System.arraycopy(packet.getPayloadBytes(), 0, fileContents, oldlength, datalen); // start at beginning payload
 
 			LFR = packetID;
 		} else {
