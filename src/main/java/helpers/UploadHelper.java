@@ -4,9 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.net.Socket;
 import java.net.UnknownHostException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -18,6 +16,7 @@ import exceptions.UtilDatagramException;
 import network.Packet;
 import network.TransportLayer;
 import protocol.FileTransferProtocol;
+import server.FileTransferClientHandler;
 
 
 /**
@@ -70,34 +69,37 @@ public class UploadHelper implements Runnable {
 	/** 
 	 * TODO
 	 */
-	List<Packet> packetList;
+	private List<Packet> packetList;
 
 	/** 
 	 * TODO
 	 */
-	int LAR;
-	int SWS;
+	private int LAR;
+	private int SWS;
 
 	/**
 	 * keep track of where we are in the data TODO
 	 */
-	int filePointer;
+	private int filePointer;
 	
 	/**
 	 * TODO
 	 */
-	byte[] fileContents;
+	private byte[] fileContents;
 	
 	/** 
 	 * Number of packets to send
 	 */
-	int totalPackets;
+	private int totalPackets;
 	
 	/**
 	 * TODO
 	 */
-	int totalAckPackets;
-	int currentPacketToSend;
+	private int totalAckPackets;
+	private int currentPacketToSend;
+	
+	private String name;
+	private UI.TUI TUI;
 
 
 	/** TODO
@@ -118,13 +120,21 @@ public class UploadHelper implements Runnable {
 		//this.waitForInitiate = waitForInitiate;
 		if (parent instanceof FileTransferClient) { // TODO or just input manually?
 			this.waitForInitiate = false;
-		} else {
+			this.name = ((FileTransferClient) parent).getName() + "_Uploader-" + fileToRead.getName();
+		} else if (parent instanceof FileTransferClientHandler) {
 			this.waitForInitiate = true;
+			this.name = ((FileTransferClientHandler) parent).getName() + "_Uploader-" + fileToRead.getName();
+		} else {
+			this.name = "Uploader-" + fileToRead.getName();
+			this.showNamedError("Unknown parent object type!");
 		}
 		
 		this.totalFileSize = totalFileSize;
 		this.fileToRead = fileToRead;
 		this.complete = false;
+		
+		this.TUI = new UI.TUI();
+		
 
 		this.packetList = new ArrayList<Packet>();
 
@@ -136,7 +146,7 @@ public class UploadHelper implements Runnable {
 
 	@Override
 	public void run() {
-		System.out.println("Sending...");
+		this.showNamedMessage("Sending...");
 		this.readFile();
 
 		totalAckPackets = 0;
@@ -185,7 +195,7 @@ public class UploadHelper implements Runnable {
 //						for (Packet p : packetList) {
 //							if (p.getId() == receivedPkt[0]) {
 //								p.setAck(true);
-//								System.out.println("Packet " + receivedPkt[0] + " ACKed!");
+//								this.showNamedMessage("Packet " + receivedPkt[0] + " ACKed!");
 //								totalAckPackets++;
 //							}
 //						}
@@ -193,10 +203,10 @@ public class UploadHelper implements Runnable {
 //					}
 //				}
 //			}
-				System.out.println("LISTENING FOR ACK");
+				this.showNamedMessage("LISTENING FOR ACK");
 		}
 
-		System.out.println("Sending completed!"); 
+		this.showNamedMessage("Sending completed!"); 
 		}
 	}
 
@@ -247,7 +257,7 @@ public class UploadHelper implements Runnable {
 					this.downloaderPort
 					); 
 
-			System.out.println("Bytes send!"); // TODO 
+			this.showNamedMessage("Bytes send!"); // TODO 
 
 		} catch (UnknownHostException | PacketException e) {
 			// TODO Auto-generated catch block
@@ -269,7 +279,7 @@ public class UploadHelper implements Runnable {
 		//	    public void TimeoutElapsed(Object tag) {
 		//	    	Packet packet = (Packet) tag;
 		//	    	if (!packet.isAck()) {
-		//	        	System.out.println("TIME OUT packet " + packet.getId() + " without ACK: resend!");
+		//	        	this.showNamedMessage("TIME OUT packet " + packet.getId() + " without ACK: resend!");
 		//	    		sendPacket(packet);
 		//	    	}
 		//	    }
@@ -284,7 +294,23 @@ public class UploadHelper implements Runnable {
 
 		this.totalPackets = (int) Math.ceil(fileContents.length/FileTransferProtocol.MAX_PAYLOAD_LENGTH);
 		if (this.totalPackets > 256) {
-			System.out.println("!! WARNING THIS IS NOT IMPLEMENTED YET!!");
+			this.showNamedError("!! WARNING THIS IS NOT IMPLEMENTED YET!!");
 		}
+	}
+	
+	/**
+	 * TODO cannot override from TUI?
+	 * @param message
+	 */
+	public void showNamedMessage(String message) {
+		TUI.showNamedMessage(this.name, message);
+	}
+	
+	/**
+	 * TODO cannot override from TUI?
+	 * @param message
+	 */
+	public void showNamedError(String message) {
+		TUI.showNamedError(this.name, message);
 	}
 }

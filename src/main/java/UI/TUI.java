@@ -100,12 +100,32 @@ public class TUI  { // TODO implements Runnable ?
 	}
 	
 	/**
+	 * TODO or override?
+	 * @param name
+	 * @param message
+	 */
+	public void showNamedMessage(String name, String message) {
+		this.showMessage("[" + name + "]: " + message);
+		
+	}
+	
+	/**
 	 * Writes the given message with error prefix to system output.
 	 * 
 	 * @param msg the message to write to the system output.
 	 */
 	public void showError(String message) {
 		showMessage(">ERROR: " + message);
+	}
+	
+	/**
+	 * TODO or override?
+	 * @param name
+	 * @param message
+	 */
+	public void showNamedError(String name, String message) {
+		this.showMessage("[" + name + "]>ERROR: " + message);
+		
 	}
 
 	/**
@@ -221,38 +241,6 @@ public class TUI  { // TODO implements Runnable ?
         return answerBool;
 	}
 	
-	/**
-	 * Prints the question and asks the user to input an Move (int, with -1 for PASS).
-	 * 
-	 * @param question the question shown to the user, asking for input
-	 * @return The written Integer, or -1 if PASS.
-	 */
-	public int getMove(String question) {
-		String answer = null;
-		int answerInt = 0;
-		Boolean answerValid = false;
-
-		while (!answerValid) {
-			this.showMessage(question); 
-			try {
-				BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
-				answer = in.readLine();
-
-				answerInt = Integer.parseInt(answer);
-				answerValid = true;
-			} catch (NumberFormatException eFormat) {				
-//				if (answer.equalsIgnoreCase(String.valueOf(TUICommands.PASS))) {
-//					return GoGameConstants.PASSint;
-//				} else {
-					this.showMessage("ERROR> " + answer +  " is not an integer nor a PASS (" 
-							+ eFormat.getLocalizedMessage() + ") try again!");
-//				}
-			} catch (IOException e) {
-				this.showMessage("IO Exception occurred");
-			}
-		}
-        return answerInt;
-	}
 
 	/**
 	 * Prints the help menu with available input options.
@@ -263,5 +251,7 @@ public class TUI  { // TODO implements Runnable ?
 		this.showMessage(TUICommands.HELP + " ................ help (this menu)");
 		System.out.println(TUICommands.EXIT + " ................ exit program");
 	}
+
+	
 	
 }

@@ -61,6 +61,8 @@ public class FileTransferClientHandler implements Runnable {
 	/** The TUI of this FileTransferServer. */
 	private UI.TUI TUI; 
 	
+	private String name;
+	
 	boolean running;
 	
 	
@@ -69,12 +71,14 @@ public class FileTransferClientHandler implements Runnable {
 	 * @param socket
 	 * @param ownPort
 	 */
-	public FileTransferClientHandler(DatagramSocket socket, Packet initPacket, FileTransferServer server) { // int port
+	public FileTransferClientHandler(DatagramSocket socket, Packet initPacket, FileTransferServer server, String name) { // int port
 		this.TUI = new UI.TUI();
 		
 		this.socket = socket;
 		this.ownPort = socket.getLocalPort();
 		this.ownAddress = socket.getLocalAddress();
+		
+		this.name = name;
 		
 		this.server = server;
 		this.fileStorage = server.getFileStorage("all"); // TODO for now hardcoded
@@ -94,7 +98,7 @@ public class FileTransferClientHandler implements Runnable {
 		this.clientAddress = initPacket.getSourceAddress();
 		this.clientPort = initPacket.getSourcePort();
 		
-		TUI.showMessage("Set client information in handler: done ");
+		this.showNamedMessage("Set client information in handler: done ");
 	}
 	
 	/**
@@ -106,28 +110,28 @@ public class FileTransferClientHandler implements Runnable {
 		while(running) { // keep listening
 			Packet receivedPacket = null;
 
-			TUI.showMessage("Listening for client requests...");
+			this.showNamedMessage("Listening for client requests...");
 
 			try {
 				receivedPacket = TransportLayer.receivePacket(this.socket);
 			} catch (IOException | PacketException | UtilDatagramException e) {
 				// TODO Auto-generated catch block
-				TUI.showError("Someting went wrong with recieving a packet!");
-				TUI.showError("Not going to process it: trying to receive a new packet");
+				this.showNamedError("Someting went wrong with recieving a packet!");
+				this.showNamedError("Not going to process it: trying to receive a new packet");
 				//e.printStackTrace();
 			}
 
 			if (receivedPacket == null) {
-				TUI.showError("Someting went wrong with recieving a packet!");
-				TUI.showError("Not going to process it: trying to receive a new packet");
+				this.showNamedError("Someting went wrong with recieving a packet!");
+				this.showNamedError("Not going to process it: trying to receive a new packet");
 			} else {
-				TUI.showMessage("Received a packet: going to process it...");
-				TUI.showMessage("Packet payload: " + new String(receivedPacket.getPayload()));
+				this.showNamedMessage("Received a packet: going to process it...");
+				this.showNamedMessage("Packet payload: " + new String(receivedPacket.getPayload()));
 				
 				String receivedString = receivedPacket.getPayloadString();
-				TUI.showMessage("Received String: " + receivedString);
+				this.showNamedMessage("Received String: " + receivedString);
 				byte[] receivedBytes = receivedPacket.getPayloadBytes();
-				TUI.showMessage("Received bytes: " + receivedString);
+				this.showNamedMessage("Received bytes: " + receivedString);
 
 				this.processRequest(receivedString, receivedBytes);
 			}
@@ -140,10 +144,10 @@ public class FileTransferClientHandler implements Runnable {
 		// TODO NOT convert from bytes to String and back!
 		//https://stackoverflow.com/questions/22519346/how-to-split-a-byte-array-around-a-byte-sequence-in-java/29084734
 		// https://stackoverflow.com/questions/2758654/conversion-of-byte-into-a-string-and-then-back-to-a-byte
-		//TUI.showMessage("RequestBytes: " + Arrays.toString(requestBytes));
+		//this.showNamedMessage("RequestBytes: " + Arrays.toString(requestBytes));
 		
 		String[] request = this.getArguments(requestString); 
-		TUI.showMessage("Received request: " + Arrays.toString(request));
+		this.showNamedMessage("Received request: " + Arrays.toString(request));
 		
 		String command = request[0]; //.charAt(0); // TODO or String?
 		// TODO check string being null, to prevent nullpointer exception?!
@@ -152,19 +156,19 @@ public class FileTransferClientHandler implements Runnable {
 		switch (command) {
 			case FileTransferProtocol.LIST_FILES:
 				// do something
-				TUI.showMessage("Client requested list of files...");
+				this.showNamedMessage("Client requested list of files...");
 				//String list = this.listFiles();
 				//this.sendBytesToClient(list.getBytes());
 				this.sendBytesToClient(this.listFiles(), 0);
 				break;
 
 			case FileTransferProtocol.DOWNLOAD:
-				TUI.showMessage("Client requested download of single file...");
+				this.showNamedMessage("Client requested download of single file...");
 				try {
 					File fileToUpload = util.Bytes.deserialiseByteArrayToFile(requestBytes); //(request[1].getBytes());
-					TUI.showMessage("File: " + fileToUpload.getAbsolutePath());
+					this.showNamedMessage("File: " + fileToUpload.getAbsolutePath());
 					int downloaderPort = util.Bytes.byteArray2int(request[1].getBytes());
-					TUI.showMessage("To downloader on port: " + downloaderPort);
+					this.showNamedMessage("To downloader on port: " + downloaderPort);
 					this.downloadSingle(fileToUpload, downloaderPort);
 				} catch (ClassNotFoundException | IOException e) {
 					// TODO Auto-generated catch block
@@ -174,12 +178,12 @@ public class FileTransferClientHandler implements Runnable {
 				break;
 
 			default:
-				TUI.showError("Unknow command received"); // what TODO with it?
+				this.showNamedError("Unknow command received"); // what TODO with it?
 		}
 //		} catch (Exception e) { // TODO specify!
 //
 //		}
-		TUI.showMessage("... done!");
+		this.showNamedMessage("... done!");
 
 	}
 
@@ -192,7 +196,7 @@ public class FileTransferClientHandler implements Runnable {
 		
 		// TODO: store this info in clientHandler?!! (aks to request update if changed since last time)
 
-		TUI.showMessage("Creating list of files in current directory..");
+		this.showNamedMessage("Creating list of files in current directory..");
 		// https://www.baeldung.com/java-list-directory-files
 		int depth = 1;
 		//Path dir = this.fileStorage; // Paths.get(dir)
@@ -290,7 +294,7 @@ public class FileTransferClientHandler implements Runnable {
 					this.clientPort
 			); 
 			
-			TUI.showMessage("Bytes send!");
+			this.showNamedMessage("Bytes send!");
 			
 		} catch (UnknownHostException | PacketException e) {
 			// TODO Auto-generated catch block
@@ -315,6 +319,26 @@ public class FileTransferClientHandler implements Runnable {
 	
 	public int getPort() {
 		return this.ownPort;
+	}
+	
+	public String getName() {
+		return name;
+	}
+
+	/**
+	 * TODO cannot override from TUI?
+	 * @param message
+	 */
+	public void showNamedMessage(String message) {
+		TUI.showNamedMessage(this.name, message);
+	}
+	
+	/**
+	 * TODO cannot override from TUI?
+	 * @param message
+	 */
+	public void showNamedError(String message) {
+		TUI.showNamedError(this.name, message);
 	}
 	
 }

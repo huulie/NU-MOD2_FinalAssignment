@@ -18,6 +18,7 @@ import exceptions.UtilDatagramException;
 import network.Packet;
 import network.TransportLayer;
 import protocol.FileTransferProtocol;
+import server.FileTransferClientHandler;
 
 
 /**
@@ -70,18 +71,21 @@ public class DownloadHelper implements Runnable {
 	/**
 	 * TODO
 	 */
-	List<Packet> receivedPacketList;
+	private List<Packet> receivedPacketList;
 
 	/**
 	 * TODO
 	 */
-	int LFR;
-	int RWS;
+	private int LFR;
+	private int RWS;
 
 	/**
 	 * TODO
 	 */
-	byte[] fileContents;
+	private byte[] fileContents;
+	
+	private String name;
+	private UI.TUI TUI;
 
 	/** TODO
 	 * @param parent
@@ -101,13 +105,20 @@ public class DownloadHelper implements Runnable {
 		//this.initiate = initiate;
 		if (parent instanceof FileTransferClient) { // TODO or just input manually?
 			this.initiate = true;
-		} else {
+			this.name = ((FileTransferClient) parent).getName() + "_Uploader-" + fileToWrite.getName();
+		} else if (parent instanceof FileTransferClientHandler) {
 			this.initiate = false;
+			this.name = ((FileTransferClientHandler) parent).getName() + "_Uploader-" + fileToWrite.getName();
+		} else {
+			this.name = "Uploader-" + fileToWrite.getName();
+			this.showNamedError("Unknown parent object type!");
 		}
 		
 		this.totalFileSize = totalFileSize;
 		this.fileToWrite = fileToWrite;
 		this.complete = false;
+		
+		this.TUI = new UI.TUI();
 
 		List<Packet> receivedPacketList = new ArrayList<Packet>();
 
@@ -127,8 +138,8 @@ public class DownloadHelper implements Runnable {
 			this.initiateTransfer();
 		} 
 
-		System.out.println("Total file size = " + this.totalFileSize);
-		System.out.println("Receiving...");
+		this.showNamedMessage("Total file size = " + this.totalFileSize);
+		this.showNamedMessage("Receiving...");
 
 
 		while (!this.complete) { // loop until we are done receiving the file
@@ -180,13 +191,13 @@ public class DownloadHelper implements Runnable {
 		//      
 		//  	int totalFileSize = ByteBuffer.wrap(totalFileSizeBytes).getInt(); // assuming Big-endian!
 		//  	int totalFileSize = packet.; // get total file size from header
-		//  	System.out.println("Total file size = " + totalFileSize);
+		//  	this.showNamedMessage("Total file size = " + totalFileSize);
 
 		// tell the user
-		System.out.println("Received packet " + packetID + ", length="+packet.getPayloadLength());
+		this.showNamedMessage("Received packet " + packetID + ", length="+packet.getPayloadLength());
 
 		if (packetID > LFR && packetID <= LFR+RWS) {
-			System.out.println("Processing packet " + packetID);
+			this.showNamedMessage("Processing packet " + packetID);
 			// append the packet's data part (excluding the header) to the fileContents array, first making it larger
 			int oldlength=fileContents.length;
 			int datalen= packet.getPayloadLength();; //packet.length - HEADERSIZE;
@@ -195,7 +206,7 @@ public class DownloadHelper implements Runnable {
 
 			LFR = packetID;
 		} else {
-			System.out.println("DROPPING packet " + packetID);
+			this.showNamedMessage("DROPPING packet " + packetID);
 		}
 
 
@@ -208,7 +219,7 @@ public class DownloadHelper implements Runnable {
 
 	public void checkComplete() {
 		if (fileContents.length >= this.totalFileSize) {
-			System.out.println("File received completely");
+			this.showNamedMessage("File received completely");
 			this.complete = true;
 		} else {
 			this.complete = false;
@@ -233,7 +244,7 @@ public class DownloadHelper implements Runnable {
 					this.uploaderPort
 					); 
 
-			System.out.println("Bytes send!"); // TODO 
+			this.showNamedMessage("Bytes send!"); // TODO 
 
 		} catch (UnknownHostException | PacketException e) {
 			// TODO Auto-generated catch block
@@ -256,5 +267,20 @@ public class DownloadHelper implements Runnable {
 		this.uploaderPort = uploaderPort;
 	}
 	
+	/**
+	 * TODO cannot override from TUI?
+	 * @param message
+	 */
+	public void showNamedMessage(String message) {
+		TUI.showNamedMessage(this.name, message);
+	}
+	
+	/**
+	 * TODO cannot override from TUI?
+	 * @param message
+	 */
+	public void showNamedError(String message) {
+		TUI.showNamedError(this.name, message);
+	}
 	
 }
