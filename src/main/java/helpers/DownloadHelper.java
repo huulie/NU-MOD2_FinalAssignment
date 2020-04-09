@@ -172,6 +172,7 @@ public class DownloadHelper implements Runnable {
 
 	public void initiateTransfer() {
 		this.sendBytesToUploader(FileTransferProtocol.START_DOWNLOAD);
+		this.showNamedMessage("Upload initiated...");
 	}
 
 	public void processPacket(Packet packet) {
@@ -236,7 +237,7 @@ public class DownloadHelper implements Runnable {
 					this.uploaderAddress, 
 					this.uploaderPort,
 					bytesToSend
-					);
+					); // TODO only sending bytes, so no byteOffset
 
 			TransportLayer.sendPacket(
 					this.downloadSocket,

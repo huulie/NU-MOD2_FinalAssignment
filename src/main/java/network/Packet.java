@@ -171,7 +171,8 @@ public class Packet {
 		if (this.byteOffset > this.payloadLength) {
 			return null;
 		} else {
-			return Arrays.copyOfRange(this.getPayload(), this.byteOffset, this.payloadLength + 1);
+			return Arrays.copyOfRange(this.getPayload(), this.byteOffset, this.payloadLength); 
+			// TODO length is already index  + 1
 			// TODO note to is exclusive
 		}
 	}

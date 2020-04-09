@@ -76,7 +76,7 @@ public class FileTransferServer implements Runnable {
 		this.clientsWaitingList = new ArrayList<>();
 
 		this.TUI = new UI.TUI();
-		name = "FTserver"; // TODO fixed name, let user set it?
+		name = "FTServer"; // TODO fixed name, let user set it?
 		
 		this.fileStorageDirName = "FTSstorage";
 

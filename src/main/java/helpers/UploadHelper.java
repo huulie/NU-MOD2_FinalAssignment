@@ -120,10 +120,10 @@ public class UploadHelper implements Runnable {
 		//this.waitForInitiate = waitForInitiate;
 		if (parent instanceof FileTransferClient) { // TODO or just input manually?
 			this.waitForInitiate = false;
-			this.name = ((FileTransferClient) parent).getName() + "_Uploader-" + fileToRead.getName();
+			this.name = ((FileTransferClient) parent).getName() + "_Downloader-" + fileToRead.getName();
 		} else if (parent instanceof FileTransferClientHandler) {
 			this.waitForInitiate = true;
-			this.name = ((FileTransferClientHandler) parent).getName() + "_Uploader-" + fileToRead.getName();
+			this.name = ((FileTransferClientHandler) parent).getName() + "_Downloader-" + fileToRead.getName();
 		} else {
 			this.name = "Uploader-" + fileToRead.getName();
 			this.showNamedError("Unknown parent object type!");
@@ -153,21 +153,34 @@ public class UploadHelper implements Runnable {
 		currentPacketToSend = 0;
 
 		if (waitForInitiate) {
+			this.showNamedMessage("Waiting for initiation by downloader...");
 			boolean proceed = false;
 
 			while (!proceed) {
 				try {
 					Packet receivedPacket = TransportLayer.receivePacket(this.uploadSocket);
 
-					if (Arrays.equals(receivedPacket.getPayloadBytes(),FileTransferProtocol.START_DOWNLOAD)) {
+					System.out.println("DEBUG"); // TODO
+					System.out.println(Arrays.toString(receivedPacket.getPayloadBytes()));
+					System.out.println(Arrays.toString(FileTransferProtocol.START_DOWNLOAD));
+					
+					
+					if (Arrays.equals(receivedPacket.getPayloadBytes(), 
+							FileTransferProtocol.START_DOWNLOAD)) {
 						proceed = true;
+					} else {
+						this.showNamedError("Unknown packet received: " 
+								+ new String(receivedPacket.getPayload())); // TODO payload parse? 
 					}
 				} catch (IOException | PacketException | UtilDatagramException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 			}
+			this.showNamedMessage("Download initiated!");
 		}
+		
+		this.showNamedMessage("Starting byte transfer...");
 		
 		while (!(filePointer >= fileContents.length || totalAckPackets == totalPackets)) {
 			// while not reached end of the file OR not all packets are acknowledged
@@ -249,7 +262,7 @@ public class UploadHelper implements Runnable {
 					this.downloaderAddress, 
 					this.downloaderPort,
 					bytesToSend
-					);
+					); // TODO only sending bytes, so no byteOffset
 
 			TransportLayer.sendPacket(
 					this.uploadSocket,
@@ -290,7 +303,13 @@ public class UploadHelper implements Runnable {
 	public void readFile() {
 		// read from the input file
 		//Integer[] fileContents = Utils.getFileContents(getFileID());
-		this.fileContents = util.FileOperations.getFileContents(this.fileToRead);
+		try {
+			this.fileContents = util.FileOperations.getFileContents(this.fileToRead);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			this.showNamedError("Reading file failed!");
+			e.printStackTrace();
+		}
 
 		this.totalPackets = (int) Math.ceil(fileContents.length/FileTransferProtocol.MAX_PAYLOAD_LENGTH);
 		if (this.totalPackets > 256) {

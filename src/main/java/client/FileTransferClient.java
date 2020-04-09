@@ -99,7 +99,7 @@ public class FileTransferClient {
 		
 		this.downloads = new ArrayList<>();
 		
-		name = "FTclient"; // TODO fixed name, let user set it?
+		name = "FTClient"; // TODO fixed name, let user set it?
 
 		// Do setup
 		boolean setupSucces = false;
@@ -211,8 +211,8 @@ public class FileTransferClient {
 		boolean success = false;
 		
 		try {
-			this.serverAddress = NetworkLayer.getAdressByName("nvc4122.nedap.local");
-//			this.serverAddress = NetworkLayer.getAdressByName("nu-pi-huub");
+//			this.serverAddress = NetworkLayer.getAdressByName("nvc4122.nedap.local");
+			this.serverAddress = NetworkLayer.getAdressByName("nu-pi-huub"); // TODO let user set server
 			success = true;
 		} catch (UnknownHostException e) {
 			// TODO Auto-generated catch block
@@ -259,7 +259,7 @@ public class FileTransferClient {
 					break;
 
 				case FileTransferProtocol.DOWNLOAD_SINGLE:
-					int indexToDownload = TUI.getInt("Which index to download?");
+					int indexToDownload = TUI.getInt("Which index to download?"); // TODO make safeguard for bounds?!t
 					File fileToDownload = this.serverFiles[indexToDownload];
 					
 					if (!this.downloadSingleFile(fileToDownload)) { // TODO clear?
@@ -357,12 +357,13 @@ public class FileTransferClient {
 			DatagramSocket downloadSocket = TransportLayer.openNewDatagramSocket();
 			
 			DownloadHelper downloadHelper = new DownloadHelper(this,
-					downloadSocket, this.serverAddress, -1, fileSizeToDownload, fileToWrite);
+					downloadSocket, this.serverAddress, -2, fileSizeToDownload, fileToWrite); // TODO unset port uploader
 			// TODO uploaderPort still to set
 			this.downloads.add(downloadHelper);
 
 			// TODO request file, provide downloaderHelper port
-			byte[] singleFileRequest = util.Bytes.concatArray(FileTransferProtocol.DOWNLOAD.getBytes(),
+			byte[] singleFileRequest = util.Bytes.concatArray(
+					FileTransferProtocol.DOWNLOAD.getBytes(),
 					FileTransferProtocol.DELIMITER.getBytes(),
 					util.Bytes.int2ByteArray(downloadSocket.getLocalPort()), // TODO ask to helper/
 					FileTransferProtocol.DELIMITER.getBytes());
@@ -380,7 +381,8 @@ public class FileTransferClient {
 			String[] responseSplit = this.getArguments(responseString);
 			
 			if (responseSplit[0].contentEquals(FileTransferProtocol.UPLOAD)) {
-				downloadHelper.setUploaderPort(Integer.parseInt(responseSplit[1])); // TODO keep protocol in mind!
+				downloadHelper.setUploaderPort(Integer.parseInt(responseSplit[1])); 
+				// TODO keep protocol in mind!
 				this.showNamedMessage("Uploader is on server port = " + Integer.parseInt(responseSplit[1])); //TODO efficiency
 				
 				// TODO now everything is known: start download helper
