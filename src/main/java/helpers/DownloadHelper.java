@@ -105,13 +105,14 @@ public class DownloadHelper implements Runnable {
 		//this.initiate = initiate;
 		if (parent instanceof FileTransferClient) { // TODO or just input manually?
 			this.initiate = true;
-			this.name = ((FileTransferClient) parent).getName() + "_Uploader-" + fileToWrite.getName();
+			this.name = ((FileTransferClient) parent).getName() + "_Downloader-" + fileToWrite.getName();
 		} else if (parent instanceof FileTransferClientHandler) {
 			this.initiate = false;
-			this.name = ((FileTransferClientHandler) parent).getName() + "_Uploader-" + fileToWrite.getName();
+			this.name = ((FileTransferClientHandler) parent).getName() + "_Downloader-" + fileToWrite.getName();
 		} else {
-			this.name = "Uploader-" + fileToWrite.getName();
+			this.name = "Downloader-" + fileToWrite.getName();
 			this.showNamedError("Unknown parent object type!");
+			// TODO set initiate or not? 
 		}
 		
 		this.totalFileSize = totalFileSize;
@@ -122,8 +123,8 @@ public class DownloadHelper implements Runnable {
 
 		List<Packet> receivedPacketList = new ArrayList<Packet>();
 
-		int LFR = -1;
-		int RWS = 1;
+		LFR = -1;
+		RWS = 1;
 
 		// create the array that will contain the file contents
 		// note: we don't know yet how large the file will be, so the easiest (but not most efficient)
@@ -134,57 +135,59 @@ public class DownloadHelper implements Runnable {
 
 	@Override
 	public void run() {
+		this.showNamedMessage("Starting download helper...");
+
+		
 		if (initiate) {
 			this.initiateTransfer();
 		} 
 
-		this.showNamedMessage("Total file size = " + this.totalFileSize);
+		this.showNamedMessage("Total file size = " + this.totalFileSize + " bytes");
 		this.showNamedMessage("Receiving...");
 
 
 		while (!this.complete) { // loop until we are done receiving the file
-
-			// try to receive a packet from the network layer
-			try {
-				Packet packet = TransportLayer.receivePacket(this.downloadSocket);
-
-
-				// if we indeed received a packet
-				if (packet != null) {
-					this.processPacket(packet);
-					this.checkComplete(); // only stop when whole file is in 
-				} else {
-					// wait ~10ms (or however long the OS makes us wait) before trying again
-					try {
-						Thread.sleep(10);
-					} catch (InterruptedException e) {
-						this.complete = true; // TODO
-					}
-				}
-			} catch (IOException | PacketException | UtilDatagramException e1) {
-				// TODO Auto-generated catch block
-				e1.printStackTrace();
-			}
-
+			this.receiveBytes();
 		} 
+		
+		this.writeFile();
 
 	}
 
 	public void initiateTransfer() {
-		this.sendBytesToUploader(FileTransferProtocol.START_DOWNLOAD);
-		this.showNamedMessage("Upload initiated...");
+		this.sendBytesToUploader(0, FileTransferProtocol.START_DOWNLOAD); // TODO id?
+		this.showNamedMessage("Download initiated...");
 	}
 
-	public void processPacket(Packet packet) {
-		//      // extract packet header
-		//  	Integer[] header = new Integer[HEADERSIZE];
-		//  	for(int i = 0; i < HEADERSIZE; i++) {
-		//      	header[i] = packet[i];
-		//      	}
+	public void receiveBytes() {
+		// try to receive a packet from the network layer
+		try {
+			Packet packet = TransportLayer.receivePacket(this.downloadSocket);
 
+
+			// if we indeed received a packet
+			if (packet != null) {
+				this.processPacket(packet);
+				this.checkComplete(); // only stop when whole file is in 
+			} else {
+				// wait ~10ms (or however long the OS makes us wait) before trying again
+				try {
+					Thread.sleep(10);
+				} catch (InterruptedException e) {
+					this.showNamedError("INTERRUPTED EXCEPTION occured");
+					//this.complete = true; // TODO
+				}
+			}
+		} catch (IOException | PacketException | UtilDatagramException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+	}
+	
+	public void processPacket(Packet packet) {
 		int packetID = packet.getId();
 
-		// get total file size from header
+		// get total file size from header // TODO not including in every packet?
 		//  	byte[] totalFileSizeBytes = new byte[MAX_FILE_SIZE_BYTES];
 		//  	for(int i = ID_BYTES; i < MAX_FILE_SIZE_BYTES+ID_BYTES; i++) {
 		//      	totalFileSizeBytes[i-ID_BYTES] = header[i].byteValue();
@@ -197,27 +200,29 @@ public class DownloadHelper implements Runnable {
 		// tell the user
 		this.showNamedMessage("Received packet " + packetID + ", length="+packet.getPayloadLength());
 
-		if (packetID > LFR && packetID <= LFR+RWS) {
+		if (packetID > LFR && packetID <= LFR + RWS) {
 			this.showNamedMessage("Processing packet " + packetID);
+			
 			// append the packet's data part (excluding the header) to the fileContents array, first making it larger
-			int oldlength=fileContents.length;
-			int datalen= packet.getPayloadLength();; //packet.length - HEADERSIZE;
-			fileContents = Arrays.copyOf(fileContents, oldlength+datalen);
-			System.arraycopy(packet.getPayloadBytes(), 0, fileContents, oldlength, datalen); // start at beginning payload
+			int oldlength = fileContents.length;
+			int datalen = packet.getPayloadLength(); //packet.length - HEADERSIZE;
+			fileContents = Arrays.copyOf(fileContents, oldlength + datalen);
+			System.arraycopy(packet.getPayloadBytes(), 0, fileContents, oldlength, datalen); 
+			// TODO start at beginning payload
 
 			LFR = packetID;
+			
+			this.sendAck(packetID);
 		} else {
 			this.showNamedMessage("DROPPING packet " + packetID);
 		}
 
-
-		// send ACK
-		//      Integer[] ACKpacket = new Integer[1];
-		//      ACKpacket[0] = packetID;
-		//      getNetworkLayer().sendPacket(ACKpacket);
-
 	}
 
+	public void sendAck(int idToAck) {
+		this.sendBytesToUploader(idToAck, FileTransferProtocol.ACK);
+	}
+	
 	public void checkComplete() {
 		if (fileContents.length >= this.totalFileSize) {
 			this.showNamedMessage("File received completely");
@@ -228,10 +233,10 @@ public class DownloadHelper implements Runnable {
 
 	}
 
-	public void sendBytesToUploader(byte[] bytesToSend) { // TODO put in seperate utility?
+	public void sendBytesToUploader(int id, byte[] bytesToSend) { // TODO put in seperate utility?
 		try { // to construct and send a packet
 			Packet packet = new Packet(
-					0, // TODO id
+					id, 
 					this.downloadSocket.getLocalAddress(), // TODO request once and store? pass on?
 					this.downloadSocket.getLocalPort(), 
 					this.uploaderAddress, 
@@ -263,9 +268,20 @@ public class DownloadHelper implements Runnable {
 
 	}
 
+	public void writeFile() {
+		this.showNamedMessage("Writing file contents to file...");
+		long timestamp = System.currentTimeMillis();
+		util.FileOperations.setFileContents(this.fileContents, this.fileToWrite, timestamp);
+		this.showNamedMessage("... file written to " + this.fileToWrite.getAbsolutePath());
+	}
+	
 
 	public void setUploaderPort(int uploaderPort) {
 		this.uploaderPort = uploaderPort;
+	}
+	
+	public void setTotalFileSize(int totalFileSize) {
+		this.totalFileSize = totalFileSize;
 	}
 	
 	/**

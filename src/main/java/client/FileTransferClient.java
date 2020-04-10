@@ -210,15 +210,20 @@ public class FileTransferClient {
 	public boolean setServer() { //(InetAddress serverAdress, int serverPort) {
 		boolean success = false;
 		
+//		String serverName = "nvc4122.nedap.local";
+		String serverName = "nu-pi-huub";
+		
 		try {
-//			this.serverAddress = NetworkLayer.getAdressByName("nvc4122.nedap.local");
-			this.serverAddress = NetworkLayer.getAdressByName("nu-pi-huub"); // TODO let user set server
+			this.serverAddress = NetworkLayer.getAdressByName(serverName); // TODO let user set server
 			success = true;
 		} catch (UnknownHostException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} 
 		this.serverPort = FileTransferProtocol.DEFAULT_SERVER_PORT;
+		
+		this.showNamedMessage("Server set to " + serverName + ", with address " +
+				this.serverAddress + " and port " + this.serverPort);
 		
 		return success;
 	}
@@ -241,7 +246,7 @@ public class FileTransferClient {
 		try {
 			switch (command) {
 				case "start session":
-					if(!this.sessionActive) {
+					if (!this.sessionActive) {
 						this.showNamedMessage("Initiating session with server...");
 						while (!this.requestSession()) { // TODO clear?
 							TUI.getBoolean("Try again?");
@@ -259,9 +264,13 @@ public class FileTransferClient {
 					break;
 
 				case FileTransferProtocol.DOWNLOAD_SINGLE:
-					int indexToDownload = TUI.getInt("Which index to download?"); // TODO make safeguard for bounds?!t
+					int indexToDownload = -1;
+
+					while (!(indexToDownload >= 0 && indexToDownload < this.serverFiles.length)) {
+						indexToDownload = TUI.getInt("Which index to download?"); 
+					}
 					File fileToDownload = this.serverFiles[indexToDownload];
-					
+
 					if (!this.downloadSingleFile(fileToDownload)) { // TODO clear?
 						this.showNamedError("Downloading file failed");
 					}
@@ -352,21 +361,20 @@ public class FileTransferClient {
 		try {
 			// create downloadHandler
 			File fileToWrite = new File(this.fileStorage.toString() +
-					File.pathSeparator + fileToDownload.getName());
-			int fileSizeToDownload = (int) fileToDownload.length(); // TODO casting long to int!
+					File.separator + fileToDownload.getName());
+//			int fileSizeToDownload = (int) fileToDownload.length(); // TODO will return zero at this local filesystem! TODO casting long to int!
 			DatagramSocket downloadSocket = TransportLayer.openNewDatagramSocket();
 			
 			DownloadHelper downloadHelper = new DownloadHelper(this,
-					downloadSocket, this.serverAddress, -2, fileSizeToDownload, fileToWrite); // TODO unset port uploader
+					downloadSocket, this.serverAddress, -2, -1, fileToWrite); // TODO unset port uploader and fileSize
 			// TODO uploaderPort still to set
 			this.downloads.add(downloadHelper);
 
 			// TODO request file, provide downloaderHelper port
-			byte[] singleFileRequest = util.Bytes.concatArray(
-					FileTransferProtocol.DOWNLOAD.getBytes(),
-					FileTransferProtocol.DELIMITER.getBytes(),
-					util.Bytes.int2ByteArray(downloadSocket.getLocalPort()), // TODO ask to helper/
-					FileTransferProtocol.DELIMITER.getBytes());
+			byte[] singleFileRequest = (FileTransferProtocol.DOWNLOAD + 
+					FileTransferProtocol.DELIMITER + 
+					downloadSocket.getLocalPort()).getBytes(); // + // TODO ask to helper/
+					//FileTransferProtocol.DELIMITER.getBytes());
 			
 			byte[] fileToDownloadBytes = util.Bytes.serialiseObjectToByteArray(fileToDownload); 
 			
@@ -384,6 +392,10 @@ public class FileTransferClient {
 				downloadHelper.setUploaderPort(Integer.parseInt(responseSplit[1])); 
 				// TODO keep protocol in mind!
 				this.showNamedMessage("Uploader is on server port = " + Integer.parseInt(responseSplit[1])); //TODO efficiency
+				downloadHelper.setTotalFileSize(Integer.parseInt(responseSplit[2])); 
+				// TODO keep protocol in mind!
+				this.showNamedMessage("Uploader reports total file size = " + Integer.parseInt(responseSplit[2])+ " bytes"); //TODO efficiency
+				
 				
 				// TODO now everything is known: start download helper
 				new Thread(downloadHelper).start();
@@ -398,9 +410,6 @@ public class FileTransferClient {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (UtilByteException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (PacketException e) {

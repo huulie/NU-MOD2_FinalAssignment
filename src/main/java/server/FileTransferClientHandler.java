@@ -167,9 +167,14 @@ public class FileTransferClientHandler implements Runnable {
 				try {
 					File fileToUpload = util.Bytes.deserialiseByteArrayToFile(requestBytes); //(request[1].getBytes());
 					this.showNamedMessage("File: " + fileToUpload.getAbsolutePath());
-					int downloaderPort = util.Bytes.byteArray2int(request[1].getBytes());
+					
+					int downloaderPort = Integer.parseInt(request[1]);
 					this.showNamedMessage("To downloader on port: " + downloaderPort);
+					
 					this.downloadSingle(fileToUpload, downloaderPort);
+				} catch (NumberFormatException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
 				} catch (ClassNotFoundException | IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
@@ -256,14 +261,14 @@ public class FileTransferClientHandler implements Runnable {
 			byte[] singleFileResponse = (FileTransferProtocol.UPLOAD +
 					FileTransferProtocol.DELIMITER +
 					uploadSocket.getLocalPort() + // TODO ask to helper/?
-					FileTransferProtocol.DELIMITER).getBytes();
+					FileTransferProtocol.DELIMITER + 
+					fileSizeToUpload).getBytes();
 			
 			byte[] fileToUploadBytes = util.Bytes.serialiseObjectToByteArray(fileToUpload);
 			
 			
-					 
 			this.sendBytesToClient(util.Bytes.concatArray(singleFileResponse, fileToUploadBytes),
-					singleFileResponse.length-1 + 1); // TODO make this more nice + note offset is string end +1 (note length starts at 1)
+					singleFileResponse.length - 1 + 1); // TODO make this more nice + note offset is string end +1 (note length starts at 1)
 
 
 		} catch (SocketException e) {

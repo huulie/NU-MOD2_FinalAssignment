@@ -113,6 +113,8 @@ public class FileTransferServer implements Runnable {
 		boolean succesSocket = this.setupSocket();
 		this.setupOwnAddress();
 		
+		this.setupTimeoutThread();
+		
 		success = successFileSystem && succesSocket;
 		
 		if (success) {
@@ -180,6 +182,11 @@ public class FileTransferServer implements Runnable {
 		} catch (UnknownHostException e) {
 			this.showNamedMessage("Could not determine own address: " + e.getLocalizedMessage());
 		} 
+	}
+	
+	public void setupTimeoutThread() {
+		util.TimeOut.Start();
+		this.showNamedMessage("TimeOut helper started...");
 	}
 	
 	// ------------------ Server Methods --------------------------
@@ -286,6 +293,9 @@ public class FileTransferServer implements Runnable {
 
 		// see example on github? 
 		this.socket.close(); // TODO make a method for this, ensure!
+		
+		util.TimeOut.Stop();
+		this.showNamedMessage("TimeOut helper stopped.");
 
 	}
 	

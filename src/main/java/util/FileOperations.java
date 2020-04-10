@@ -47,13 +47,15 @@ public class FileOperations {
      * @param fileContents the contents to write
      * @param id the file ID
      */
-    public static void setFileContents(byte[] fileContents, int id, long timestamp) {
-        File fileToWrite = new File(String.format("rdtcOutput%d.%d.png", id, timestamp));
-        try (FileOutputStream fileStream = new FileOutputStream(fileToWrite)) {
-            for (byte fileContent : fileContents) {
-                fileStream.write(fileContent);
-            }
-        } catch (Exception e) {
+    public static void setFileContents(byte[] fileContents, File fileToWrite, long timestamp) {
+       // File fileToWrite = new File(String.format("rdtcOutput%d.%d.png", id, timestamp));
+         
+        try (FileOutputStream fileStream = new FileOutputStream(fileToWrite)) { // TODO add timestamp? or remove argument!
+//            for (byte fileContent : fileContents) {
+//                fileStream.write(fileContent);
+//            }
+        	fileStream.write(fileContents); // TODO this can be done all-at-once?
+        } catch (IOException e) { // TODO instead of general exception
             System.err.println(e.getMessage());
             System.err.println(e.getStackTrace());
         }

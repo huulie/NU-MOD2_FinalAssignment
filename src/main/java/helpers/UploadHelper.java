@@ -4,7 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.net.UnknownHostException;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -24,7 +24,7 @@ import server.FileTransferClientHandler;
  * @author huub.lievestro
  *
  */
-public class UploadHelper implements Runnable {
+public class UploadHelper implements Runnable, util.ITimeoutEventHandler { 
 
 	/**
 	 * Coonected process TODO
@@ -127,6 +127,7 @@ public class UploadHelper implements Runnable {
 		} else {
 			this.name = "Uploader-" + fileToRead.getName();
 			this.showNamedError("Unknown parent object type!");
+			// TODO set wait for initialise or not? 
 		}
 		
 		this.totalFileSize = totalFileSize;
@@ -139,19 +140,50 @@ public class UploadHelper implements Runnable {
 		this.packetList = new ArrayList<Packet>();
 
 		LAR = -1;
-		SWS = 2;
+		SWS = 1;
 
 		this.filePointer = 0;
+		
 	}
 
 	@Override
 	public void run() {
-		this.showNamedMessage("Sending...");
+		this.showNamedMessage("Starting upload helper...");
 		this.readFile();
+		
+		this.waitForInitiate();
 
 		totalAckPackets = 0;
 		currentPacketToSend = 0;
 
+		
+		this.showNamedMessage("Starting byte transfer...");
+		this.transferBytes();
+		
+	}
+
+	public void readFile() {
+		// read from the input file
+		//Integer[] fileContents = Utils.getFileContents(getFileID());
+		try {
+			this.fileContents = util.FileOperations.getFileContents(this.fileToRead);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			this.showNamedError("Reading file failed!");
+			e.printStackTrace();
+		}
+
+		this.totalPackets = (int) Math.ceil(fileContents.length/FileTransferProtocol.MAX_PAYLOAD_LENGTH);
+		this.showNamedMessage("Total number of packets to send: " + this.totalPackets);
+		if (this.totalPackets > 256) {
+			this.showNamedError("!! WARNING THIS IS NOT IMPLEMENTED YET!!");
+		}
+	}
+	
+	/** 
+	 * TODO
+	 */
+	public void waitForInitiate() {
 		if (waitForInitiate) {
 			this.showNamedMessage("Waiting for initiation by downloader...");
 			boolean proceed = false;
@@ -179,57 +211,82 @@ public class UploadHelper implements Runnable {
 			}
 			this.showNamedMessage("Download initiated!");
 		}
-		
-		this.showNamedMessage("Starting byte transfer...");
-		
-		while (!(filePointer >= fileContents.length || totalAckPackets == totalPackets)) {
-			// while not reached end of the file OR not all packets are acknowledged
+	}
+	
+	public void transferBytes() {
+		while (!(filePointer >= fileContents.length && totalAckPackets == totalPackets)) {
+			// while not (reached end of the file AND all packets are acknowledged)
 
-			if(currentPacketToSend <= LAR + SWS && currentPacketToSend <= totalPackets) { // inside send window size
-				// send the packet
-				int packetID = currentPacketToSend;
-//				Packet packet = new Packet(packetID,generateContent(packetID, fileContents, filePointer));
-//				sendPacket(packet);
-//				packetList.add(packet);
-				
-				this.sendBytesToDownloader(generateContent(packetID, fileContents, filePointer)); // TODO reduce with instance var?
-
-				filePointer += Math.min(FileTransferProtocol.MAX_PAYLOAD_LENGTH, fileContents.length - filePointer); // datalen
-				currentPacketToSend++;
-
+			if (currentPacketToSend <= LAR + SWS && currentPacketToSend <= totalPackets) { 
+				this.sendNextPacket();
 			} else {
-//				// listen for ACKs
-//				Integer[] receivedPkt = null;
-//				boolean ackReceived = false;
-//				while (!ackReceived) {
-//					receivedPkt = getNetworkLayer().receivePacket();
-//					if (receivedPkt != null && receivedPkt.length == 1 ) {
-//						LAR = receivedPkt[0];
-//						for (Packet p : packetList) {
-//							if (p.getId() == receivedPkt[0]) {
-//								p.setAck(true);
-//								this.showNamedMessage("Packet " + receivedPkt[0] + " ACKed!");
-//								totalAckPackets++;
-//							}
-//						}
-//						ackReceived = true;
-//					}
-//				}
-//			}
-				this.showNamedMessage("LISTENING FOR ACK");
+				this.listenForAck();
+			}
 		}
-
 		this.showNamedMessage("Sending completed!"); 
+	}
+	
+	public void sendNextPacket() {
+		// inside send window size = send the packet
+		int packetID = currentPacketToSend;
+		
+		this.sendBytesToDownloader(packetID, generatePayload()); 
+		// TODO reduce with instance var: fileContents, filePointer
+
+		filePointer += Math.min(FileTransferProtocol.MAX_PAYLOAD_LENGTH,
+				fileContents.length - filePointer); // datalen
+		
+		this.showNamedMessage("Packet " + packetID + " send..");
+		currentPacketToSend++;
+	}
+	
+	public void listenForAck() {
+		try {
+			this.showNamedMessage("Listening for ACK(s)...");
+
+			boolean ackReceived = false;
+
+			while (!ackReceived) {
+				
+				//if the socket does not receive anything in 1 second, 
+				//it will timeout and throw a SocketTimeoutException
+				//you can catch the exception if you need to log, or you can ignore it
+				// this.uploadSocket.setSoTimeout(1000); // TODO
+				
+				Packet receivedPacket = TransportLayer.receivePacket(this.uploadSocket);
+				if (receivedPacket != null && 
+						Arrays.equals(receivedPacket.getPayloadBytes(), FileTransferProtocol.ACK)) {
+
+					int receivedId = receivedPacket.getId();
+					LAR = receivedId;
+					this.setPacketAck(receivedId);
+					
+					ackReceived = true;
+				} else {
+					this.showNamedError("Unknown packet received: " 
+							+ new String(receivedPacket.getPayload())); // TODO payload parse?
+				}
+			}
+
+//		} catch (InterruptedException e) { // on TimeOut
+//			// let is resend
+//			// resume listening
+		} catch (SocketTimeoutException e) {
+			this.showNamedMessage("Socket timed-out: retry receive");
+			this.listenForAck();
+		} catch (IOException | PacketException | UtilDatagramException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 	}
-
-
-	public byte[] generateContent(int packetID, byte[] fileContents, int filePointer) {
-		int datalen = Math.min(FileTransferProtocol.MAX_PAYLOAD_LENGTH, fileContents.length - filePointer);
+	
+	public byte[] generatePayload() { // TOD instance var byte[] fileContents, int filePointer
+		int datalen = Math.min(FileTransferProtocol.MAX_PAYLOAD_LENGTH,
+				fileContents.length - filePointer);
 //		Integer[] pkt = new Integer[HEADERSIZE + datalen];
-		byte[] pkt = new byte[datalen];
+		byte[] payload = new byte[datalen];
 
-//		// write file size into the header byte
+//		// write file size into the header byte TODO not include every packet? 
 //		int fileSize = fileContents.length; 
 //		ByteBuffer b = ByteBuffer.allocate(4);
 //		b.putInt(fileSize); // using Big Endian! 
@@ -238,25 +295,33 @@ public class UploadHelper implements Runnable {
 //		for (int i = 0; i < MAX_FILE_SIZE_BYTES; i++) {
 //			fileSizeInBytes[i] = Byte.valueOf(fileSizeBytes[i]).intValue();
 //		}
-//
-//		// Assign header bytes:
-//		pkt[0] = packetID;
-//
-//		for(int i = ID_BYTES; i < MAX_FILE_SIZE_BYTES+ID_BYTES; i++) {
-//			pkt[i] = fileSizeInBytes[i-ID_BYTES];
-//		}
 
-		// copy databytes from the input file into data part of the packet, i.e., after the header
-		System.arraycopy(fileContents, filePointer, pkt, 0, datalen); // HEADERSIZE replaced by zero
+		// copy databytes from the input file into data part of the packet, i.e., the payload
+		System.arraycopy(fileContents, filePointer, payload, 0, datalen); 
+		// TODO HEADERSIZE replaced by zero
 
-		return pkt;
+		return payload;
 	}
 
+	public void setPacketAck(int idToAck) {
+		boolean found = false;
+		for (Packet p : packetList) { 
+			if (p.getId() == idToAck) {
+				p.setAck(true);
+				this.showNamedMessage("Packet " + idToAck + " ACKed!");
+				totalAckPackets++;
+				found = true;
+			}
+		}
+		if (!found) {
+			this.showNamedError("Packet with ID = " + idToAck + " not found!");
+		}
+	}
 
-	public void sendBytesToDownloader(byte[] bytesToSend) { // TODO put in seperate utility?
+	public void sendBytesToDownloader(int id, byte[] bytesToSend) { // TODO put in seperate utility?
 		try { // to construct and send a packet
 			Packet packet = new Packet(
-					0, // TODO id
+					id,
 					this.uploadSocket.getLocalAddress(), // TODO request once and store? pass on?
 					this.uploadSocket.getLocalPort(), 
 					this.downloaderAddress, 
@@ -264,58 +329,46 @@ public class UploadHelper implements Runnable {
 					bytesToSend
 					); // TODO only sending bytes, so no byteOffset
 
+			this.sendPacketToDownloader(packet);
+
+			packetList.add(packet); // TODO from loop
+
+			this.showNamedMessage("Bytes send!"); // TODO 
+
+		} catch (PacketException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	public void sendPacketToDownloader(Packet packet) {
+		try {
 			TransportLayer.sendPacket(
 					this.uploadSocket,
 					packet,
 					this.downloaderPort
-					); 
-
-			this.showNamedMessage("Bytes send!"); // TODO 
-
-		} catch (UnknownHostException | PacketException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (UtilByteException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (UtilDatagramException e) {
+					);
+		} catch (IOException | UtilByteException | UtilDatagramException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-
-		// TODO framework.Utils.Timeout.SetTimeout(1000, this, packet);
-		//	    
-		//	    @Override
-		//	    public void TimeoutElapsed(Object tag) {
-		//	    	Packet packet = (Packet) tag;
-		//	    	if (!packet.isAck()) {
-		//	        	this.showNamedMessage("TIME OUT packet " + packet.getId() + " without ACK: resend!");
-		//	    		sendPacket(packet);
-		//	    	}
-		//	    }
 		
+		util.TimeOut.setTimeOut(1000, this, packet); 
+		// TODO let it break after certain number of resends?
 	}
-	
-
-	public void readFile() {
-		// read from the input file
-		//Integer[] fileContents = Utils.getFileContents(getFileID());
-		try {
-			this.fileContents = util.FileOperations.getFileContents(this.fileToRead);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			this.showNamedError("Reading file failed!");
-			e.printStackTrace();
-		}
-
-		this.totalPackets = (int) Math.ceil(fileContents.length/FileTransferProtocol.MAX_PAYLOAD_LENGTH);
-		if (this.totalPackets > 256) {
-			this.showNamedError("!! WARNING THIS IS NOT IMPLEMENTED YET!!");
+		
+			    
+	@Override
+	public void TimeoutElapsed(Object tag) {
+		Packet packet = (Packet) tag;
+		if (!packet.isAck()) {
+			//Thread.interrupt();// TODO how to get thread to resend while waiting on this ACK?
+			this.showNamedMessage("TIME OUT packet " + packet.getId() + " without ACK: resend!");
+			sendPacketToDownloader(packet);
 		}
 	}
+		
+
 	
 	/**
 	 * TODO cannot override from TUI?
