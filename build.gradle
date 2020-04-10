@@ -10,6 +10,7 @@
 buildscript {
     repositories {
         jcenter()
+        mavenCentral()
     }
 }
 
@@ -17,6 +18,14 @@ plugins {
     id "org.hidetake.ssh" version "2.10.1"
     id 'java'
     id 'application'
+}
+
+repositories { // scope also outside buildscript
+    mavenCentral()
+}
+
+dependencies {
+    compile 'me.tongfei:progressbar:0.8.1'
 }
 
 // Global settings
