@@ -17,19 +17,49 @@ import protocol.FileTransferProtocol;
  */
 public class Datagram {
 
-	public static int getHeaderPayloadLength(byte[] datagram) throws UtilDatagramException {
-		int payloadLength = -1;
+	public static int getHeaderId(byte[] datagram) throws UtilDatagramException {
+		int id = -1;
 		
 		try {
-			payloadLength = util.Bytes.byteArray2int(util.Bytes.subArray(datagram,
-					FileTransferProtocol.HEADER_PAYLOAD_LENGTH_START,
-					FileTransferProtocol.HEADER_PAYLOAD_LENGTH_LAST));
+			id = util.Bytes.byteArray2int(util.Bytes.subArray(datagram,
+					FileTransferProtocol.HEADER_ID_START,
+					FileTransferProtocol.HEADER_ID_LAST));
 		} catch (UtilByteException e) {
 			// TODO Auto-generated catch block
 			throw new UtilDatagramException(e.getLocalizedMessage());
 		}
 		
-		return payloadLength;
+		return id;
+	}
+	
+	public static int getHeaderHeaderLength(byte[] datagram) throws UtilDatagramException {
+		int headerLength = -1;
+		
+		try {
+			headerLength = util.Bytes.byteArray2int(util.Bytes.subArray(datagram,
+					FileTransferProtocol.HEADER_HEADER_LENGTH_START,
+					FileTransferProtocol.HEADER_HEADER_LENGTH_LAST));
+		} catch (UtilByteException e) {
+			// TODO Auto-generated catch block
+			throw new UtilDatagramException(e.getLocalizedMessage());
+		}
+		
+		return headerLength;
+	}
+	
+	public static int getHeaderByteOffset(byte[] datagram) throws UtilDatagramException {
+		int byteOffset = -1;
+		
+		try {
+			byteOffset = util.Bytes.byteArray2int(util.Bytes.subArray(datagram,
+					FileTransferProtocol.HEADER_BYTE_OFFSET_START,
+					FileTransferProtocol.HEADER_BYTE_OFFSET_LAST));
+		} catch (UtilByteException e) {
+			// TODO Auto-generated catch block
+			throw new UtilDatagramException(e.getLocalizedMessage());
+		}
+		
+		return byteOffset;
 	}
 	
 	public static byte[] getPayload(byte[] datagram, int payloadLength) throws UtilDatagramException {
@@ -56,6 +86,43 @@ public class Datagram {
 		return receivedDatagram.getAddress();
 	}
 	
+	/**
+	 * TODO note only works for received datagrams! 
+	 * @param datagram
+	 * @param localSocket
+	 * @return
+	 * @throws PacketException
+	 * @throws UtilDatagramException 
+	 */
+	public static Packet createPacketFromDatagram(DatagramPacket datagram, DatagramSocket receivingSocket) 
+			throws PacketException, UtilDatagramException {
+		
+		// TODO
+        // getLength()
+        // Returns the length of the data to be sent or the length of the data received.
+        
+        byte[] data = datagram.getData();
+
+        int id = util.Datagram.getHeaderId(data);
+        int headerLength = util.Datagram.getHeaderHeaderLength(data);
+        int byteOffset = util.Datagram.getHeaderByteOffset(data);
+        
+        int payloadLength = datagram.getLength() - headerLength;
+        byte[] payload = util.Datagram.getPayload(data, payloadLength);
+		
+		Packet packet = new Packet(
+				id, 
+				util.Datagram.getDatagramSourceAddress(datagram),
+				datagram.getPort(),
+				receivingSocket.getLocalAddress(), // TODO: assume own address? 
+				receivingSocket.getPort(), // TODO: retains binding to port number, or LOCALport?
+				payload,// TODO: remove any padding?! Based on payload length field
+				byteOffset
+				); // TODO: id, null should be own address / from datagram?
+		
+		return packet;
+	}
+	
 	public static DatagramPacket buildDatagram(Packet packet, int destinationPort) throws UtilDatagramException {
 		
 		byte[] header = buildHeader(packet);
@@ -74,49 +141,20 @@ public class Datagram {
 	
 	public static byte[] buildHeader(Packet packet) throws UtilDatagramException {
 		// write file size into the header byte 
-		byte[] payloadSizeBytes;
+		byte[] header;
 		try {
-			payloadSizeBytes = util.Bytes.int2ByteArray(packet.getPayloadLength());
+			byte[] idBytes = util.Bytes.int2ByteArray(packet.getId());
+			byte[] headerSizeBytes = util.Bytes.int2ByteArray(FileTransferProtocol.TOTAL_HEADER_SIZE);
+					//TODO util.Bytes.int2ByteArray(packet.getPayloadLength());
+			byte[] byteOffsetBytes = util.Bytes.int2ByteArray(packet.getByteOffset());
+		
+			header = util.Bytes.concatArray(idBytes, headerSizeBytes, byteOffsetBytes);
 		} catch (UtilByteException e) {
 			// TODO Auto-generated catch block
 			throw new UtilDatagramException(e.getLocalizedMessage());
 		}
 
-		byte[] header = payloadSizeBytes;
-
 		return header;
 	}
 	
-	
-	/**
-	 * TODO note only works for received datagrams! 
-	 * @param datagram
-	 * @param localSocket
-	 * @return
-	 * @throws PacketException
-	 * @throws UtilDatagramException 
-	 */
-	public static Packet createPacketFromDatagram(DatagramPacket datagram, DatagramSocket receivingSocket) 
-			throws PacketException, UtilDatagramException {
-		
-		// TODO
-        // getLength()
-        // Returns the length of the data to be sent or the length of the data received.
-        
-        byte[] data = datagram.getData();
-
-        int payloadLength = util.Datagram.getHeaderPayloadLength(data); 
-        byte[] payload = util.Datagram.getPayload(data, payloadLength);
-		
-		Packet packet = new Packet(
-				0, 
-				util.Datagram.getDatagramSourceAddress(datagram),
-				datagram.getPort(),
-				receivingSocket.getLocalAddress(), // TODO: assume own address? 
-				receivingSocket.getPort(), // TODO: retains binding to port number, or LOCALport?
-				payload// TODO: remove any padding?! Based on payload length field
-				); // TODO: id, null should be own address / from datagram?
-		
-		return packet;
-	}
 }

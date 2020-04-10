@@ -48,10 +48,31 @@ public class FileTransferProtocol {
 	public static final String DOWNLOAD_SINGLE = "downSingle";
 	
 	/**
+	 * TODO download: dowloadHelper port; file (object as bytes); 
+	 */
+	public static final String DOWNLOAD = "DOWNLOAD";
+	
+	/**
+	 * TODO upload: uploadHelper port, file (object as bytes)  
+	 */
+	public static final String UPLOAD = "UPLOAD";
+	
+	/**
+	 * TODO .
+	 */
+	public static final byte[] START_DOWNLOAD = "START".getBytes(); 
+	
+	/**
+	 * TODO .
+	 */
+	public static final byte[] ACK = "ACK".getBytes(); 
+	
+	
+	/**
 	 * TODO
 	 */
 	// PACKET DATA FORMAT: header (x bytes) + payload (maximum size: PACKET_SIZE - x bytes)
-	// header (bytes): payloadLength ( =
+	// header (bytes): id (), headerLength ( = , byteOffset()
 	// NOTE: number of bytes of payloadLength field is dependent on PACKET_SIZE: length (in bytes) = log2(PACKET_SIZE)/8
 	// NOTE: part of the datagram header (like address and port) is managed by the used libraries, and thus not included here.
 
@@ -62,20 +83,42 @@ public class FileTransferProtocol {
 	
 	/**
 	 * TODO . 
+	 * NOTE: ID should be encoded with big-endian encoding
+	 * NOTE: ID may not be larger than 4 bytes = 4*8 bits => (4*8)^2 = 1024
+	 */
+	public static final int HEADER_ID_START = 0;
+	public static final int HEADER_ID_LAST = HEADER_ID_START 
+			//+ (int) Math.ceil(Math.log(MAX_PACKET_SIZE) / Math.log(2) / 8);
+			+ 3; // TODO the int2Byte always puts in block of 4 bytes
+	
+	/**
+	 * TODO . 
+	 * NOTE: payload length should be encoded with big-endian encoding
+	 * NOTE: may not be larger than 4 bytes = 4*8 bits => (4*8)^2 = 1024
+	 */
+	public static final int HEADER_HEADER_LENGTH_START = HEADER_ID_LAST + 1;
+	public static final int HEADER_HEADER_LENGTH_LAST = HEADER_HEADER_LENGTH_START 
+			//+ (int) Math.ceil(Math.log(MAX_PACKET_SIZE) / Math.log(2) / 8);
+			+ 3; // TODO the int2Byte always puts in block of 4 bytes 
+	
+	/**
+	 * TODO . 
 	 * NOTE: payload length should be encoded with big-endian encoding
 	 */
-	public static final int HEADER_PAYLOAD_LENGTH_START = 0;
-	public static final int HEADER_PAYLOAD_LENGTH_LAST = HEADER_PAYLOAD_LENGTH_START 
+	public static final int HEADER_BYTE_OFFSET_START = HEADER_HEADER_LENGTH_LAST + 1;
+	public static final int HEADER_BYTE_OFFSET_LAST = HEADER_BYTE_OFFSET_START 
 			//+ (int) Math.ceil(Math.log(MAX_PACKET_SIZE) / Math.log(2) / 8);
 			+ 3; // TODO the int2Byte always puts in block of 4 bytes 
 
 	/**
 	 * TODO .
-	 * set total header size to last assigned header field
+	 * set total header size to last assigned header field, in bytes
+	 * NOTE: plus one, because indices start at zero (and lengths at one)
+	 * NOTE: may not be larger than 4 bytes = 4*8 bits => (4*8)^2 = 1024
 	 */
-	public static final int TOTAL_HEADER_SIZE = HEADER_PAYLOAD_LENGTH_LAST;
+	public static final int TOTAL_HEADER_SIZE = HEADER_BYTE_OFFSET_LAST + 1;
 	
-	public static final int PAYLOAD_START = HEADER_PAYLOAD_LENGTH_LAST + 1;
+	public static final int PAYLOAD_START = TOTAL_HEADER_SIZE; // TODO header size already plus one
 	
 
 	

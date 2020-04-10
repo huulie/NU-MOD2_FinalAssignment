@@ -46,6 +46,11 @@ public class FileTransferServer implements Runnable {
 	InetAddress ownAddress = null;
 	int ownPort = 0;
 	
+	/*
+	 * TODO
+	 */
+	private String name;
+	
 	/**
 	 * TODO
 	 */
@@ -71,6 +76,7 @@ public class FileTransferServer implements Runnable {
 		this.clientsWaitingList = new ArrayList<>();
 
 		this.TUI = new UI.TUI();
+		name = "FTServer"; // TODO fixed name, let user set it?
 		
 		this.fileStorageDirName = "FTSstorage";
 
@@ -97,7 +103,7 @@ public class FileTransferServer implements Runnable {
 	 * @ensures a serverSocket is opened.
 	 */
 	public boolean setup() throws exceptions.ExitProgram {
-		TUI.showMessage("Setting up the server...");
+		this.showNamedMessage("Setting up the server...");
 		boolean success = false;
 		
 		// First, initialise the Server.
@@ -107,10 +113,12 @@ public class FileTransferServer implements Runnable {
 		boolean succesSocket = this.setupSocket();
 		this.setupOwnAddress();
 		
+		this.setupTimeoutThread();
+		
 		success = successFileSystem && succesSocket;
 		
 		if (success) {
-			TUI.showMessage("Setup complete!");
+			this.showNamedMessage("Setup complete!");
 		}
 		
 		return success;
@@ -119,25 +127,25 @@ public class FileTransferServer implements Runnable {
 	public boolean setupFileSystem() {
 		boolean success = false;
 		this.root = Paths.get("").toAbsolutePath(); // TODO suitable method? https://www.baeldung.com/java-current-directory
-		TUI.showMessage("Server root path set to: " + this.root.toString());
+		this.showNamedMessage("Server root path set to: " + this.root.toString());
 		
 		this.fileStorage = root.resolve(fileStorageDirName);
-		TUI.showMessage("File storage set to: " + this.fileStorage.toString());
+		this.showNamedMessage("File storage set to: " + this.fileStorage.toString());
 
 		
 //		if (!Files.exists(fileStorage)) { // TODO: use if or catch exception
             try {
 				Files.createDirectory(fileStorage);
-		    	TUI.showMessage("File storage directory did not exist: created " + fileStorageDirName + " in server root"); 
+		    	this.showNamedMessage("File storage directory did not exist: created " + fileStorageDirName + " in server root"); 
             } catch(java.nio.file.FileAlreadyExistsException eExist) {
-            	TUI.showMessage("File storage directory already exist: not doing anything with " + fileStorageDirName + " in server root");
+            	this.showNamedMessage("File storage directory already exist: not doing anything with " + fileStorageDirName + " in server root");
             } catch (IOException e) {
 				// TODO Auto-generated catch block
-				TUI.showError("Failed to create file storage: server CRASHED because " + e.getLocalizedMessage());
+				this.showNamedError("Failed to create file storage: server CRASHED because " + e.getLocalizedMessage());
 				e.printStackTrace();
 			}
 //        } else {
-//	    	TUI.showMessage("File storage directory already exist: not doing anything with " + fileStorageDirName + " in server root"); 
+//	    	this.showNamedMessage("File storage directory already exist: not doing anything with " + fileStorageDirName + " in server root"); 
 //        }
             success = true;
     		return success;
@@ -145,16 +153,16 @@ public class FileTransferServer implements Runnable {
 
 	public boolean setupSocket() throws ExitProgram {
 		boolean success = false;
-		TUI.showMessage("Trying to open a new socket...");
+		this.showNamedMessage("Trying to open a new socket...");
 		while (this.socket == null) { // TODO: ask for server port?
 			//port = TUI.getInt("Please enter the server port.");
 
 			try {
 				this.socket = TransportLayer.openNewDatagramSocket(this.ownPort);
-				TUI.showMessage("Server now bound to port " + ownPort);
+				this.showNamedMessage("Server now bound to port " + ownPort);
 				success = true;
 			} catch (SocketException e) {
-				TUI.showMessage("Something went wrong when opening the socket: "
+				this.showNamedMessage("Something went wrong when opening the socket: "
 						+ e.getLocalizedMessage());
 				if (!TUI.getBoolean("Do you want to try again?")) {
 					throw new exceptions.ExitProgram("User indicated to exit the "
@@ -169,11 +177,16 @@ public class FileTransferServer implements Runnable {
 	public void setupOwnAddress() {
 		try {
 			this.ownAddress = NetworkLayer.getOwnAddress(); // TODO replace by discover?
-			TUI.showMessage("Server listing on: " + this.ownAddress);
-			TUI.showMessage("NOTE: depending on detection method, this may NOT be the actual interface used");
+			this.showNamedMessage("Server listing on: " + this.ownAddress);
+			this.showNamedMessage("NOTE: depending on detection method, this may NOT be the actual interface used");
 		} catch (UnknownHostException e) {
-			TUI.showMessage("Could not determine own address: " + e.getLocalizedMessage());
+			this.showNamedMessage("Could not determine own address: " + e.getLocalizedMessage());
 		} 
+	}
+	
+	public void setupTimeoutThread() {
+		util.TimeOut.Start();
+		this.showNamedMessage("TimeOut helper started...");
 	}
 	
 	// ------------------ Server Methods --------------------------
@@ -188,20 +201,21 @@ public class FileTransferServer implements Runnable {
 	public void run() {
 		try {
 			while (true) {
-				TUI.showMessage("Waiting for client...");
+				this.showNamedMessage("Waiting for client...");
 
 				Packet receivedPacket = TransportLayer.receivePacket(this.socket);
 
-				System.out.println(Arrays.toString(receivedPacket.getPayload()));
+				System.out.println("DEBUG:"); // TODO
+				System.out.println(Arrays.toString(receivedPacket.getPayload())); // TODO payloadBytes?
 				System.out.println(Arrays.toString(FileTransferProtocol.INIT_SESSION));
 
-				if (Arrays.equals(receivedPacket.getPayload() , (FileTransferProtocol.INIT_SESSION))) { 
+				if (Arrays.equals(receivedPacket.getPayload() , (FileTransferProtocol.INIT_SESSION))) {  // TODO payloadBytes?
 					// TODO note: different from .equals() for strings!
 					this.handleSessionRequest(receivedPacket);
 				} else {
-					TUI.showError("Unknown packet: dropping");
-					TUI.showError("Content was: : " + receivedPacket.getPayloadAsString()
-							+ " (in bytes: " + Arrays.toString(receivedPacket.getPayload()) + ")");
+					this.showNamedError("Unknown packet: dropping");
+					this.showNamedError("Content was: : " + receivedPacket.getPayloadString()
+							+ " (in bytes: " + Arrays.toString(receivedPacket.getPayload()) + ")"); //TODO no payloadBytes
 					// TODO send unknown message back? 
 				}
 
@@ -228,15 +242,15 @@ public class FileTransferServer implements Runnable {
 	public void handleSessionRequest(Packet sessionInitPacket) {
 		InetAddress clientAddres = sessionInitPacket.getSourceAddress();
 
-		String name = "Client " 
+		String clientName = "Client " 
 				+ String.format("%02d", next_client_no++);
-		TUI.showMessage("A new client " + name + "  is trying to connect from "
+		this.showNamedMessage("A new client " + clientName + "  is trying to connect from "
 				+ clientAddres + "...");
 
 		try {
 			DatagramSocket sessionSocket = TransportLayer.openNewDatagramSocket(); 
 			FileTransferClientHandler handler = new FileTransferClientHandler(sessionSocket,
-					sessionInitPacket, this); //TODO (sock, this, name);
+					sessionInitPacket, this, "handler-" + clientName); //TODO (sock, this, name);
 
 			new Thread(handler).start();
 			clients.add(handler);
@@ -244,9 +258,12 @@ public class FileTransferServer implements Runnable {
 			int sessionPortNumber = handler.getPort();
 			byte[] initResponse = util.Bytes.concatArray(FileTransferProtocol.INIT_SESSION,
 					(FileTransferProtocol.DELIMITER + sessionPortNumber).getBytes());
-			this.sendBytesToClient(initResponse, sessionInitPacket.getSourceAddress(), sessionInitPacket.getSourcePort());
+			this.sendBytesToClient(initResponse,
+					sessionInitPacket.getSourceAddress(),
+					sessionInitPacket.getSourcePort(),
+					initResponse.length-1+1); // TODO make this more nice + note offset is string end +1 (note length starts at 1)
 
-			TUI.showMessage("New client [" + name + "] connected, on port " 
+			this.showNamedMessage("New client [" + clientName + "] connected, on port " 
 					+ handler.getPort() + " !"); 
 
 		} catch (IOException e) {
@@ -272,10 +289,13 @@ public class FileTransferServer implements Runnable {
 	 * Shutdown server TODO (try with resources?!)
 	 */
 	public void shutdown() {
-		TUI.showMessage("See you later!");
+		this.showNamedMessage("See you later!");
 
 		// see example on github? 
 		this.socket.close(); // TODO make a method for this, ensure!
+		
+		util.TimeOut.Stop();
+		this.showNamedMessage("TimeOut helper stopped.");
 
 	}
 	
@@ -306,7 +326,7 @@ public class FileTransferServer implements Runnable {
 		return clientFileStorage;
 	}
 	
-	public void sendBytesToClient(byte[] bytesToSend, InetAddress clientAddress, int clientPort) { // TODO put in separate utility?
+	public void sendBytesToClient(byte[] bytesToSend, InetAddress clientAddress, int clientPort, int byteOffset) { // TODO put in separate utility?
 		try { // to construct and send a packet
 			Packet packet = new Packet(
 						0, // TODO id
@@ -314,7 +334,8 @@ public class FileTransferServer implements Runnable {
 						this.ownPort, 
 						clientAddress, 
 						clientPort,
-						bytesToSend
+						bytesToSend,
+						byteOffset
 				);
 			
 			TransportLayer.sendPacket(
@@ -323,7 +344,7 @@ public class FileTransferServer implements Runnable {
 					clientPort
 			); 
 			
-			TUI.showMessage("Bytes send!");
+			this.showNamedMessage("Bytes send!");
 			
 		} catch (UnknownHostException | PacketException e) {
 			// TODO Auto-generated catch block
@@ -338,6 +359,22 @@ public class FileTransferServer implements Runnable {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+	}
+	
+	/**
+	 * TODO cannot override from TUI?
+	 * @param message
+	 */
+	public void showNamedMessage(String message) {
+		TUI.showNamedMessage(this.name, message);
+	}
+	
+	/**
+	 * TODO cannot override from TUI?
+	 * @param message
+	 */
+	public void showNamedError(String message) {
+		TUI.showNamedError(this.name, message);
 	}
 
 	// ------------------ Main --------------------------
