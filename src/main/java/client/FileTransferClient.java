@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -348,8 +349,8 @@ public class FileTransferClient {
 
 		File[] fileArray = null; // String[]
 
-		this.showNamedMessage("Waiting for server response...");
-		Packet receivedPacket = TransportLayer.receivePacket(this.socket);
+		Packet receivedPacket = this.receiveServerResponse(); // TODO handle null gracefully
+		
 		byte[] responseBytes = receivedPacket.getPayloadBytes();
 		this.showNamedMessage("Server response received, now processing...");
 
@@ -398,8 +399,7 @@ public class FileTransferClient {
 					singleFileRequest.length-1 + 1); // TODO make this more nice + note offset is string end +1 (note length starts at 1)
 
 			// TODO now wait for response, with uploadHelper port
-			this.showNamedMessage("Waiting for server response...");
-			Packet receivedPacket = TransportLayer.receivePacket(this.socket);
+			Packet receivedPacket = this.receiveServerResponse(); // TODO handle null gracefully
 			
 			String responseString = receivedPacket.getPayloadString();
 			String[] responseSplit = this.getArguments(responseString);
@@ -426,12 +426,6 @@ public class FileTransferClient {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (PacketException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (UtilDatagramException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
@@ -496,8 +490,7 @@ public class FileTransferClient {
 					singleFileAnnouncement.length-1 + 1); // TODO make this more nice + note offset is string end +1 (note length starts at 1)
 
 			// TODO now wait for response, with uploadHelper port
-			this.showNamedMessage("Waiting for server response..."); // TODO time-out?!
-			Packet receivedPacket = TransportLayer.receivePacket(this.socket);
+			Packet receivedPacket = this.receiveServerResponse(); // TODO handle null gracefully
 			
 			String responseString = receivedPacket.getPayloadString();
 			String[] responseSplit = this.getArguments(responseString);
@@ -521,12 +514,6 @@ public class FileTransferClient {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (PacketException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (UtilDatagramException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
@@ -569,6 +556,45 @@ public class FileTransferClient {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+	}
+	
+	/**
+	 * TODO
+	 * @return
+	 */
+	public Packet receiveServerResponse() {
+		this.showNamedMessage("Waiting for server response...");
+
+		Packet receivedPacket = null;
+		try {
+			//if the socket does not receive anything in 1 second, 
+			//it will timeout and throw a SocketTimeoutException
+			//you can catch the exception if you need to log, or you can ignore it
+			this.socket.setSoTimeout(1000); // TODO and TODO set it permanently? in setup? 
+
+			receivedPacket = TransportLayer.receivePacket(this.socket);
+
+			if (!(receivedPacket.getSourceAddress().equals(this.serverAddress)
+					&& receivedPacket.getSourcePort() == this.serverPort)) { 
+				this.showNamedError("SECURITY WARNING: this response is NOT"
+						+ " coming for known server > dropping it");
+				return null;
+			}
+
+		} catch (SocketTimeoutException e) { // on TimeOut
+			this.showNamedError("Receiving a server response timed out"); // TODO retry?
+			return null;
+		} catch (SocketException e) {
+			this.showNamedError("Something went wrong while receiving"
+					+ " a server response: " + e.getLocalizedMessage());
+			return null;
+		} catch (IOException | PacketException | UtilDatagramException e) {
+			this.showNamedError("Something went wrong while receiving"
+					+ " a server response: " + e.getLocalizedMessage());
+			return null;
+		}
+
+		return receivedPacket;
 	}
 	
 	/**

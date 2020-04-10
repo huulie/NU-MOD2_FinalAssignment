@@ -134,6 +134,13 @@ public class FileTransferClientHandler implements Runnable {
 				this.showNamedMessage("Received a packet: going to process it...");
 				this.showNamedMessage("Packet payload: " + new String(receivedPacket.getPayload()));
 				
+				if (!(receivedPacket.getSourceAddress().equals(this.clientAddress)
+						&& receivedPacket.getSourcePort() == this.clientPort)) { 
+					this.showNamedError("SECURITY WARNING: this response is NOT"
+							+ " coming for known client > dropping it");
+					continue;
+				}
+				
 				String receivedString = receivedPacket.getPayloadString();
 				this.showNamedMessage("Received String: " + receivedString);
 				byte[] receivedBytes = receivedPacket.getPayloadBytes();

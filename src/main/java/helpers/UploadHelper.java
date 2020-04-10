@@ -192,6 +192,13 @@ public class UploadHelper implements Runnable, util.ITimeoutEventHandler {
 				try {
 					Packet receivedPacket = TransportLayer.receivePacket(this.uploadSocket);
 
+					if (!(receivedPacket.getSourceAddress().equals(this.downloaderAddress) // TODO make seperate method?
+							&& receivedPacket.getSourcePort() == this.downloaderPort)) { 
+						this.showNamedError("SECURITY WARNING: this response is NOT"
+								+ " coming for known downloader > dropping it");
+						continue;
+					}
+					
 					System.out.println("DEBUG"); // TODO
 					System.out.println(Arrays.toString(receivedPacket.getPayloadBytes()));
 					System.out.println(Arrays.toString(FileTransferProtocol.START_DOWNLOAD));
@@ -254,7 +261,15 @@ public class UploadHelper implements Runnable, util.ITimeoutEventHandler {
 				// this.uploadSocket.setSoTimeout(1000); // TODO
 				
 				Packet receivedPacket = TransportLayer.receivePacket(this.uploadSocket);
-				if (receivedPacket != null && 
+				
+				if (!(receivedPacket.getSourceAddress().equals(this.downloaderAddress) // TODO make seperate method?
+						&& receivedPacket.getSourcePort() == this.downloaderPort)) { 
+					this.showNamedError("SECURITY WARNING: this response is NOT"
+							+ " coming for known downloader > dropping it");
+					continue;
+				}
+				
+				if (receivedPacket != null && // TODO null is now bit superfluous
 						Arrays.equals(receivedPacket.getPayloadBytes(), FileTransferProtocol.ACK)) {
 
 					int receivedId = receivedPacket.getId();

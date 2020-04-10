@@ -177,6 +177,7 @@ public class DownloadHelper implements Runnable {
 	public void receiveBytes() {
 		// try to receive a packet from the network layer
 		try {
+			
 			Packet packet = TransportLayer.receivePacket(this.downloadSocket);
 
 
@@ -200,6 +201,14 @@ public class DownloadHelper implements Runnable {
 	}
 	
 	public void processPacket(Packet packet) {
+		
+		if (!(packet.getSourceAddress().equals(this.uploaderAddress)
+				&& packet.getSourcePort() == this.uploaderPort)) { 
+			this.showNamedError("SECURITY WARNING: this response is NOT"
+					+ " coming for known uploader > dropping it");
+			return;
+		}
+		
 		int packetID = packet.getId();
 
 		// get total file size from header // TODO not including in every packet?
