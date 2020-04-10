@@ -1,6 +1,7 @@
 package client;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -19,6 +20,7 @@ import exceptions.PacketException;
 import exceptions.UtilByteException;
 import exceptions.UtilDatagramException;
 import helpers.DownloadHelper;
+import helpers.UploadHelper;
 import network.NetworkLayer;
 import network.Packet;
 import network.TransportLayer;
@@ -74,9 +76,14 @@ public class FileTransferClient {
 	
 	
 	/**
-	 *  List of download, one for each connected downloadHelper. 
+	 *  List of downloads, one for each connected downloadHelper. 
 	 *  */
 	private List<DownloadHelper> downloads;
+	
+	/**
+	 *  List of uploads, one for each connected uploadHelper. 
+	 *  */
+	private List<UploadHelper> uploads;
 	
 	boolean running;
 	
@@ -98,6 +105,7 @@ public class FileTransferClient {
 		this.sessionActive = false; // TODO may become int to support multiple sessions for one client? 
 		
 		this.downloads = new ArrayList<>();
+		this.uploads = new ArrayList<>();
 		
 		name = "FTClient"; // TODO fixed name, let user set it?
 
@@ -245,7 +253,7 @@ public class FileTransferClient {
 
 		try {
 			switch (command) {
-				case "start session":
+				case TUICommands.START_SESSION:
 					if (!this.sessionActive) {
 						this.showNamedMessage("Initiating session with server...");
 						while (!this.requestSession()) { // TODO clear?
@@ -256,14 +264,14 @@ public class FileTransferClient {
 					}
 					break;	
 
-				case FileTransferProtocol.LIST_FILES:
+				case TUICommands.LIST_FILES: 
 					this.showNamedMessage("Requesting list of files...");
 					if (!this.requestListFiles()) { // TODO clear?
 						this.showNamedError("Retrieving list of files failed");
 					}
 					break;
 
-				case FileTransferProtocol.DOWNLOAD_SINGLE:
+				case TUICommands.DOWNLOAD_SINGLE:
 					int indexToDownload = -1;
 
 					while (!(indexToDownload >= 0 && indexToDownload < this.serverFiles.length)) {
@@ -273,6 +281,14 @@ public class FileTransferClient {
 
 					if (!this.downloadSingleFile(fileToDownload)) { // TODO clear?
 						this.showNamedError("Downloading file failed");
+					}
+					break;
+					
+				case TUICommands.UPLOAD_SINGLE:
+					File fileToUpload = this.selectLocalFile();
+
+					if (!this.uploadSingleFile(fileToUpload)) { // TODO clear?
+						this.showNamedError("Uploading file failed");
 					}
 					break;
 
@@ -424,7 +440,101 @@ public class FileTransferClient {
 //		succes = true;
 				
 		return succes;
+	}
+	
+	public File[] getLocalFiles() {
+		File[] filesArray = new File(this.fileStorage.toString()).listFiles( // TODO only non-hidden
+				new FileFilter() {
+					@Override
+					public boolean accept(File file) {
+						return !file.isHidden();
+					}
+				});
 
+		System.out.println(Arrays.toString(filesArray));
+		return filesArray;
+	}
+	
+	public File selectLocalFile() {
+		File[] localFiles = this.getLocalFiles();
+		
+		int selectedIndex = -1;
+		while (!(selectedIndex >= 0 && selectedIndex < localFiles.length)) {
+			selectedIndex = TUI.getInt("Which index to upload?"); 
+		}
+		return localFiles[selectedIndex];
+	}
+	
+	public boolean uploadSingleFile(File fileToUpload) {
+		boolean succes = false;
+		
+		
+		this.showNamedMessage("WARNING: overwriting existing files on server!"); // TODO
+		try {
+			// create uploadHandler
+			DatagramSocket uploadSocket = TransportLayer.openNewDatagramSocket();
+
+			int fileSizeToUpload = (int) fileToUpload.length(); // TODO casting long to int!
+
+			UploadHelper uploadHelper = new UploadHelper(this, uploadSocket, 
+					this.serverAddress, -2, fileSizeToUpload, fileToUpload); 
+			// TODO downloader port unset
+
+			this.uploads.add(uploadHelper);
+
+			// TODO request file, provide uploaderHelper port
+			byte[] singleFileAnnouncement = (FileTransferProtocol.UPLOAD + 
+					FileTransferProtocol.DELIMITER + 
+					uploadSocket.getLocalPort() + 
+					FileTransferProtocol.DELIMITER + 
+					fileSizeToUpload).getBytes(); // + // TODO ask to helper/
+					//FileTransferProtocol.DELIMITER.getBytes());
+			
+			byte[] fileToUploadBytes = util.Bytes.serialiseObjectToByteArray(fileToUpload); 
+			
+			this.sendBytesToServer(util.Bytes.concatArray(singleFileAnnouncement, fileToUploadBytes),
+					singleFileAnnouncement.length-1 + 1); // TODO make this more nice + note offset is string end +1 (note length starts at 1)
+
+			// TODO now wait for response, with uploadHelper port
+			this.showNamedMessage("Waiting for server response..."); // TODO time-out?!
+			Packet receivedPacket = TransportLayer.receivePacket(this.socket);
+			
+			String responseString = receivedPacket.getPayloadString();
+			String[] responseSplit = this.getArguments(responseString);
+			
+			if (responseSplit[0].contentEquals(FileTransferProtocol.DOWNLOAD)) {
+				uploadHelper.setDownloaderPort(Integer.parseInt(responseSplit[1])); 
+				// TODO keep protocol in mind!
+				this.showNamedMessage("Downloader is on server port = " + Integer.parseInt(responseSplit[1])); //TODO efficiency
+				// TODO keep protocol in mind!
+				
+				// TODO now everything is known: start download helper
+				new Thread(uploadHelper).start();
+				
+				succes = true;
+			} else {
+				this.showNamedError("Invalid response to upload announcement");
+				succes = false;
+			}
+
+		} catch (SocketException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (PacketException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (UtilDatagramException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		// TODO actual uploading of file takes place in helper
+
+				
+		return succes;
 	}
 	
 	public void sendBytesToServer(byte[] bytesToSend, int byteOffset) { // TODO put in seperate utility?

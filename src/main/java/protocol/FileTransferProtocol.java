@@ -43,11 +43,6 @@ public class FileTransferProtocol {
 	public static final String LIST_FILES = "ls";
 	
 	/**
-	 * TODO .
-	 */
-	public static final String DOWNLOAD_SINGLE = "downSingle";
-	
-	/**
 	 * TODO download: dowloadHelper port; file (object as bytes); 
 	 */
 	public static final String DOWNLOAD = "DOWNLOAD";

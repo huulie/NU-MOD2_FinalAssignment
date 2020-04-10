@@ -115,7 +115,7 @@ public class TUI  { // TODO implements Runnable ?
 	 * @param msg the message to write to the system output.
 	 */
 	public void showError(String message) {
-		showMessage(">ERROR: " + message);
+		System.err.println(">ERROR: " + message);
 	}
 	
 	/**
@@ -124,7 +124,7 @@ public class TUI  { // TODO implements Runnable ?
 	 * @param message
 	 */
 	public void showNamedError(String name, String message) {
-		this.showMessage("[" + name + "]>ERROR: " + message);
+		System.err.println("[" + name + "]>ERROR: " + message);
 		
 	}
 

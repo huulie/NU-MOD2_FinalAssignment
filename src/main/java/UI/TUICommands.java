@@ -11,5 +11,24 @@ public class TUICommands {
 	public static final String EXIT = "x";
 	public static final char HELP = 'h';
 		
+	/**
+	 * TODO .
+	 */
+	public static final String START_SESSION = "start session";
+	
+	/**
+	 * TODO .
+	 */
+	public static final String LIST_FILES = "ls";
+	
+	/**
+	 * TODO .
+	 */
+	public static final String DOWNLOAD_SINGLE = "downSingle";
+	
+	/**
+	 * TODO .
+	 */
+	public static final String UPLOAD_SINGLE = "upSingle";
 	
 }

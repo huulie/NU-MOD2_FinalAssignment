@@ -52,7 +52,12 @@ public class FileTransferClientHandler implements Runnable {
 	Path fileStorage;
 	
 	/**
-	 *  List of download, one for each connected downloadHelper. 
+	 *  List of downloads, one for each connected downloadHelper. 
+	 *  */
+	private List<DownloadHelper> downloads;
+	
+	/**
+	 *  List of uploads, one for each connected uploadHelper. 
 	 *  */
 	private List<UploadHelper> uploads;
 	
@@ -83,6 +88,7 @@ public class FileTransferClientHandler implements Runnable {
 		this.server = server;
 		this.fileStorage = server.getFileStorage("all"); // TODO for now hardcoded
 
+		this.downloads = new ArrayList<>();
 		this.uploads = new ArrayList<>();
 		
 		this.running = true;
@@ -181,6 +187,34 @@ public class FileTransferClientHandler implements Runnable {
 				}
 				
 				break;
+				
+			case FileTransferProtocol.UPLOAD:
+				this.showNamedMessage("Client announced upload of single file...");
+				try {
+					File fileAnnounced = util.Bytes.deserialiseByteArrayToFile(requestBytes); 
+					// TODO naming?
+					
+					File fileToDownload = new File(this.fileStorage.toString() +
+							File.separator + fileAnnounced.getName());
+					this.showNamedMessage("File: " + fileToDownload.getAbsolutePath());
+					
+					int uploaderPort = Integer.parseInt(request[1]);
+					this.showNamedMessage("From uploader on port: " + uploaderPort);
+					
+					int totalFileSize = Integer.parseInt(request[2]);
+					this.showNamedMessage("Uploader reports total file size = " + totalFileSize + " bytes");
+
+					
+					this.uploadSingle(fileToDownload, uploaderPort, totalFileSize);
+				} catch (NumberFormatException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (ClassNotFoundException | IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
+				break;
 
 			default:
 				this.showNamedError("Unknow command received"); // what TODO with it?
@@ -243,9 +277,8 @@ public class FileTransferClientHandler implements Runnable {
 	public void downloadSingle(File fileToUpload, int downloaderPort) {
 		// create uploader helper with file and port from request
 		
-		DatagramSocket uploadSocket;
 		try {
-			uploadSocket = TransportLayer.openNewDatagramSocket();
+			DatagramSocket uploadSocket = TransportLayer.openNewDatagramSocket();
 
 			int fileSizeToUpload = (int) fileToUpload.length(); // TODO casting long to int!
 
@@ -270,6 +303,38 @@ public class FileTransferClientHandler implements Runnable {
 			this.sendBytesToClient(util.Bytes.concatArray(singleFileResponse, fileToUploadBytes),
 					singleFileResponse.length - 1 + 1); // TODO make this more nice + note offset is string end +1 (note length starts at 1)
 
+		} catch (SocketException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	public void uploadSingle(File fileToDownload, int uploaderPort, int totalFileSize) {
+		// create uploader helper with file and port from request
+		
+		try {
+			DatagramSocket downloadSocket = TransportLayer.openNewDatagramSocket();
+
+			DownloadHelper downloadHelper = new DownloadHelper(this, downloadSocket, 
+					this.clientAddress, uploaderPort, totalFileSize, fileToDownload);
+
+			this.downloads.add(downloadHelper);
+
+			// start upload helper
+			new Thread(downloadHelper).start();
+
+			// let uploadHelper know about downloader // TODO naming?!
+			byte[] singleFileResponse = (FileTransferProtocol.DOWNLOAD +
+					FileTransferProtocol.DELIMITER +
+					downloadSocket.getLocalPort()).getBytes(); // TODO ask helper? 
+			
+			byte[] fileToDownloadBytes = util.Bytes.serialiseObjectToByteArray(fileToDownload);
+			
+			this.sendBytesToClient(util.Bytes.concatArray(singleFileResponse, fileToDownloadBytes),
+					singleFileResponse.length - 1 + 1); // TODO make this more nice + note offset is string end +1 (note length starts at 1)
 
 		} catch (SocketException e) {
 			// TODO Auto-generated catch block

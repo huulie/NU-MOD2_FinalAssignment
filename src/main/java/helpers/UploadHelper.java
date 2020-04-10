@@ -370,6 +370,10 @@ public class UploadHelper implements Runnable, util.ITimeoutEventHandler {
 		
 
 	
+	public void setDownloaderPort(int downloaderPort) {
+		this.downloaderPort = downloaderPort;
+	}
+
 	/**
 	 * TODO cannot override from TUI?
 	 * @param message
