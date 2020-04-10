@@ -4,9 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.net.Socket;
 import java.net.UnknownHostException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -19,6 +17,8 @@ import network.Packet;
 import network.TransportLayer;
 import protocol.FileTransferProtocol;
 import server.FileTransferClientHandler;
+
+import me.tongfei.progressbar.*;
 
 
 /**
@@ -145,11 +145,26 @@ public class DownloadHelper implements Runnable {
 		this.showNamedMessage("Total file size = " + this.totalFileSize + " bytes");
 		this.showNamedMessage("Receiving...");
 
+		if (initiate) { // TODO running on client
+			//		try (ProgressBar pb = new ProgressBar("Test", this.totalFileSize,1)) { 
+			// TODO update to 1 ms, also see declartive/builder on doc
+			try (ProgressBar pb = new ProgressBar("Test", this.totalFileSize, 1,
+					System.err, ProgressBarStyle.COLORFUL_UNICODE_BLOCK, " Bytes",1, false, null)) {
+				pb.setExtraMessage("Downloading..."); // Set extra message at end of the bar
 
-		while (!this.complete) { // loop until we are done receiving the file
-			this.receiveBytes();
-		} 
-		
+				while (!this.complete) { // loop until we are done receiving the file
+					this.receiveBytes();
+					pb.stepTo(this.fileContents.length); // step directly to n
+				} 
+				pb.setExtraMessage("Done!"); // Set extra message to display at the end of the bar
+			}
+		} else { // TODO running on server
+			while (!this.complete) { // loop until we are done receiving the file
+				this.receiveBytes();
+			} 
+		}
+
+		this.showNamedMessage("File received completely");
 		this.writeFile();
 
 	}
@@ -198,10 +213,10 @@ public class DownloadHelper implements Runnable {
 		//  	this.showNamedMessage("Total file size = " + totalFileSize);
 
 		// tell the user
-		this.showNamedMessage("Received packet " + packetID + ", length="+packet.getPayloadLength());
+//		this.showNamedMessage("Received packet " + packetID + ", length="+packet.getPayloadLength()); // TODO debug info
 
 		if (packetID > LFR && packetID <= LFR + RWS) {
-			this.showNamedMessage("Processing packet " + packetID);
+//			this.showNamedMessage("Processing packet " + packetID); // TODO debug info
 			
 			// append the packet's data part (excluding the header) to the fileContents array, first making it larger
 			int oldlength = fileContents.length;
@@ -225,7 +240,7 @@ public class DownloadHelper implements Runnable {
 	
 	public void checkComplete() {
 		if (fileContents.length >= this.totalFileSize) {
-			this.showNamedMessage("File received completely");
+//			this.showNamedMessage("File received completely"); // TODO after progressbar
 			this.complete = true;
 		} else {
 			this.complete = false;
@@ -250,7 +265,7 @@ public class DownloadHelper implements Runnable {
 					this.uploaderPort
 					); 
 
-			this.showNamedMessage("Bytes send!"); // TODO 
+//			this.showNamedMessage("Bytes send!"); // TODO debug info
 
 		} catch (UnknownHostException | PacketException e) {
 			// TODO Auto-generated catch block
