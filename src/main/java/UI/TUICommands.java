@@ -31,4 +31,9 @@ public class TUICommands {
 	 */
 	public static final String UPLOAD_SINGLE = "upSingle";
 	
+	/**
+	 * TODO .
+	 */
+	public static final String DELETE_SINGLE = "delSingle";
+	
 }

@@ -146,8 +146,9 @@ public class FileTransferClient {
 		boolean succesSocket = this.setupSocket();
 		this.setupOwnAddress();
 		boolean succesServer = this.setServer();
+		boolean succesSession = this.setupStartSession();
 
-		success = successFileSystem && succesSocket && succesServer;
+		success = successFileSystem && succesSocket && succesServer && succesSession;
 		
 		if (success) {
 			this.showNamedMessage("Setup complete!");
@@ -237,6 +238,20 @@ public class FileTransferClient {
 		return success;
 	}
 	
+	public boolean setupStartSession() { // TODO or require at startup
+		this.showNamedMessage("Initiating session with server...");
+		try {
+			while (!this.requestSession()) { // TODO clear?
+				TUI.getBoolean("Try again?");
+			}
+		} catch (IOException | PacketException | UtilDatagramException e) {
+			// TODO Auto-generated catch block
+			TUI.showError("Something went wrong wile starting the session: " + e.getLocalizedMessage());
+		}
+		
+		return this.sessionActive;
+	}
+	
 	
 	// ------------------ Client Methods --------------------------
 
@@ -273,12 +288,7 @@ public class FileTransferClient {
 					break;
 
 				case TUICommands.DOWNLOAD_SINGLE:
-					int indexToDownload = -1;
-
-					while (!(indexToDownload >= 0 && indexToDownload < this.serverFiles.length)) {
-						indexToDownload = TUI.getInt("Which index to download?"); 
-					}
-					File fileToDownload = this.serverFiles[indexToDownload];
+					File fileToDownload = this.selectServerFile();
 
 					if (!this.downloadSingleFile(fileToDownload)) { // TODO clear?
 						this.showNamedError("Downloading file failed");
@@ -290,6 +300,14 @@ public class FileTransferClient {
 
 					if (!this.uploadSingleFile(fileToUpload)) { // TODO clear?
 						this.showNamedError("Uploading file failed");
+					}
+					break;
+					
+				case TUICommands.DELETE_SINGLE:
+					File fileToDelete= this.selectServerFile();
+
+					if (!this.deleteSingleFile(fileToDelete)) { // TODO clear?
+						this.showNamedError("Deleting file failed");
 					}
 					break;
 
@@ -454,9 +472,28 @@ public class FileTransferClient {
 		
 		int selectedIndex = -1;
 		while (!(selectedIndex >= 0 && selectedIndex < localFiles.length)) {
-			selectedIndex = TUI.getInt("Which index to upload?"); 
+			selectedIndex = TUI.getInt("Which index to select?"); 
 		}
 		return localFiles[selectedIndex];
+	}
+	
+	public File selectServerFile() {
+		int selectedIndex = -1;
+		try {
+			this.requestListFiles();
+
+			while (!(selectedIndex >= 0 && selectedIndex < this.serverFiles.length)) {
+				selectedIndex = TUI.getInt("Which index to select?"); 
+			}
+
+		} catch (IOException | PacketException | UtilDatagramException e) {
+			this.showNamedMessage("Something went wrong while refreshing"
+					+ " the server file list: " + e.getLocalizedMessage());
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		return this.serverFiles[selectedIndex];
 	}
 	
 	public boolean uploadSingleFile(File fileToUpload) {
@@ -521,6 +558,38 @@ public class FileTransferClient {
 		// TODO actual uploading of file takes place in helper
 
 				
+		return succes;
+	}
+	
+	public boolean deleteSingleFile(File fileToUpload) {
+		boolean succes = false;
+		
+		this.showNamedMessage("WARNING: this deletes files on server!"); // TODO
+		try {
+			byte[] singleFileDeleteRequest = (FileTransferProtocol.DELETE).getBytes();
+					//FileTransferProtocol.DELIMITER.getBytes());
+			
+			byte[] fileToDeleteBytes = util.Bytes.serialiseObjectToByteArray(fileToUpload); 
+			
+			this.sendBytesToServer(util.Bytes.concatArray(singleFileDeleteRequest, fileToDeleteBytes),
+					singleFileDeleteRequest.length-1 + 1); // TODO make this more nice + note offset is string end +1 (note length starts at 1)
+
+			// TODO now wait for response, with uploadHelper port
+			Packet receivedPacket = this.receiveServerResponse(); // TODO handle null gracefully
+			
+			String responseString = receivedPacket.getPayloadString();
+			String[] responseSplit = this.getArguments(responseString);
+			
+			if (responseSplit[0].contentEquals(FileTransferProtocol.DELETE)) {
+				this.showNamedMessage("File deleted!"); //TODO print more?
+				// TODO keep protocol in mind!
+				succes = true;
+			}
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			this.showNamedError("Something went wrong while serialising file object");
+		}
+		
 		return succes;
 	}
 	

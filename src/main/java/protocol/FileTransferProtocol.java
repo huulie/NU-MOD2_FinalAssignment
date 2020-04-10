@@ -53,6 +53,11 @@ public class FileTransferProtocol {
 	public static final String UPLOAD = "UPLOAD";
 	
 	/**
+	 * TODO delete: file (object as bytes); 
+	 */
+	public static final String DELETE = "DELETE";
+	
+	/**
 	 * TODO .
 	 */
 	public static final byte[] START_DOWNLOAD = "START".getBytes(); 

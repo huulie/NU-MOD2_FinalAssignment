@@ -222,6 +222,19 @@ public class FileTransferClientHandler implements Runnable {
 				}
 				
 				break;
+				
+			case FileTransferProtocol.DELETE:
+				this.showNamedMessage("Client requested deletion of single file...");
+				try {
+					File fileToDelete = util.Bytes.deserialiseByteArrayToFile(requestBytes); 
+					this.deleteSingle(fileToDelete);
+				} catch (ClassNotFoundException | IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+					
+				
+				break;
 
 			default:
 				this.showNamedError("Unknow command received"); // what TODO with it?
@@ -350,7 +363,29 @@ public class FileTransferClientHandler implements Runnable {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+	}
+	
+	public void deleteSingle(File fileToDelete) {
+		try {
+			boolean succes = fileToDelete.delete();
 
+			if (succes) { // let client know about deletion 
+				byte[] singleDeleteResponse = FileTransferProtocol.DELETE.getBytes(); // TODO ask helper? 
+
+				byte[] fileToDeleteBytes = util.Bytes.serialiseObjectToByteArray(fileToDelete);
+
+				this.sendBytesToClient(util.Bytes.concatArray(singleDeleteResponse, fileToDeleteBytes),
+						singleDeleteResponse.length - 1 + 1); // TODO make this more nice + note offset is string end +1 (note length starts at 1)
+			} else {
+				this.showNamedError("Deletion did not succeed!");
+			}
+		} catch (SocketException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 	
 	public void sendBytesToClient(byte[] bytesToSend, int byteOffset) { // TODO put in separate utility?
