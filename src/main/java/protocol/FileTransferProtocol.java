@@ -74,7 +74,7 @@ public class FileTransferProtocol {
 	/**
 	 * TODO .
 	 */
-	public static final int MAX_PACKET_SIZE = 256;
+	public static final int MAX_PACKET_SIZE = 1024; // TODO was 256
 	
 	/**
 	 * TODO . 

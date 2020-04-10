@@ -148,13 +148,13 @@ public class DownloadHelper implements Runnable {
 		if (initiate) { // TODO running on client
 			//		try (ProgressBar pb = new ProgressBar("Test", this.totalFileSize,1)) { 
 			// TODO update to 1 ms, also see declartive/builder on doc
-			try (ProgressBar pb = new ProgressBar("Test", this.totalFileSize, 1,
+			try (ProgressBar pb = new ProgressBar("Test", this.totalFileSize, 1, 
 					System.err, ProgressBarStyle.COLORFUL_UNICODE_BLOCK, " Bytes",1, false, null)) {
 				pb.setExtraMessage("Downloading..."); // Set extra message at end of the bar
 
 				while (!this.complete) { // loop until we are done receiving the file
 					this.receiveBytes();
-					pb.stepTo(this.fileContents.length); // step directly to n
+					pb.stepTo(this.fileContents.length); // step directly to n // TODO this way also counting duplicates/resends!
 				} 
 				pb.setExtraMessage("Done!"); // Set extra message to display at the end of the bar
 			}

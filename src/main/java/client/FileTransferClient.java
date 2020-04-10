@@ -570,7 +570,7 @@ public class FileTransferClient {
 			//if the socket does not receive anything in 1 second, 
 			//it will timeout and throw a SocketTimeoutException
 			//you can catch the exception if you need to log, or you can ignore it
-			this.socket.setSoTimeout(1000); // TODO and TODO set it permanently? in setup? 
+			this.socket.setSoTimeout(10000); // TODO explain  and TODO set it permanently? in setup? 
 
 			receivedPacket = TransportLayer.receivePacket(this.socket);
 

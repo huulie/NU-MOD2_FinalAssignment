@@ -101,6 +101,17 @@ public class UploadHelper implements Runnable, util.ITimeoutEventHandler {
 	private String name;
 	private UI.TUI TUI;
 
+	/**
+	 * TODO
+	 */
+	private int totalResendPackets;
+	
+	/**
+	 * TODO threshold of fraction of resend packets relative to total packets to transmit, in percentage
+	 * If above ... 
+	 */
+	private int thresholdResend;
+	
 
 	/** TODO
 	 * @param parent
@@ -142,6 +153,9 @@ public class UploadHelper implements Runnable, util.ITimeoutEventHandler {
 		LAR = -1;
 		SWS = 1;
 
+		this.totalResendPackets = 0;
+		this.thresholdResend = 25; // TODO explain in report!
+		
 		this.filePointer = 0;
 		
 	}
@@ -380,7 +394,27 @@ public class UploadHelper implements Runnable, util.ITimeoutEventHandler {
 			//Thread.interrupt();// TODO how to get thread to resend while waiting on this ACK?
 			this.showNamedMessage("TIME OUT packet " + packet.getId() + " without ACK: resend!");
 			sendPacketToDownloader(packet);
+			 this.restrictResend(packet);
 		}
+	}
+	
+	public synchronized void restrictResend(Packet packet) {
+		this.totalResendPackets++; // TODO is this thread safe? make it sync? is it a problem here?
+		
+		int currentResendRatio = this.totalResendPackets / this.totalPackets * 100;
+		if ( currentResendRatio > this.thresholdResend) {
+			this.showNamedError("Relative packet resend ratio of " + currentResendRatio 
+					+ " is above threshold (" + this.thresholdResend + "): network too unreliable = aborting transfer");
+		
+			this.complete = true; // TODO do something else, to make it stop
+			// TODO handle this
+			// TODO and let downloader know!
+			
+			packet.setAck(true); // TODO end timeout in other way!
+		
+		}
+		
+		
 	}
 		
 
