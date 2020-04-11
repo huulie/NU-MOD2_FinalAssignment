@@ -6,6 +6,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 public class FileOperations {
 
@@ -39,6 +41,16 @@ public class FileOperations {
         
         return Files.readAllBytes(Paths.get(fileToRead.getAbsolutePath())); 
         // TODO now using import java.nio.file.Files/.Paths;
+        
+        // TODO combine reading with calculating hash? (with one pass over data, both)
+        // https://stackoverflow.com/a/304350
+//        MessageDigest md = MessageDigest.getInstance("MD5");
+//        try (InputStream is = Files.newInputStream(Paths.get("file.txt"));
+//             DigestInputStream dis = new DigestInputStream(is, md)) 
+//        {
+//          /* Read decorated stream (dis) to EOF as normal... */
+//        }
+//        byte[] digest = md.digest();
 
     }
 
@@ -55,10 +67,32 @@ public class FileOperations {
 //                fileStream.write(fileContent);
 //            }
         	fileStream.write(fileContents); // TODO this can be done all-at-once?
-        } catch (IOException e) { // TODO instead of general exception
+        } catch (IOException e) { // TODO instead of general exception, THROW?
             System.err.println(e.getMessage());
             System.err.println(e.getStackTrace());
         }
     }
-	
+    
+    /**
+     * TODO get file hash as HEX string
+     * @throws NoSuchAlgorithmException 
+     * @throws  
+     */
+    public static byte[] getHashBytes(File fileToHash) throws IOException, NoSuchAlgorithmException {
+    	byte[] fileBytes = Files.readAllBytes(Paths.get(fileToHash.getAbsolutePath()));
+    	return MessageDigest.getInstance("MD5").digest(fileBytes);
+    }
+
+    /**
+     * TODO get file hash as HEX string
+     * @throws NoSuchAlgorithmException 
+     * @throws  
+     */
+    public static  String getHashHexString(File fileToHash) throws IOException, NoSuchAlgorithmException {
+    	byte[] hashBytes = getHashBytes(fileToHash);
+    	return util.Bytes.bytesToHex(hashBytes);
+    	//return javax.xml.bind.DatatypeConverter.printHexBinary(hashBytes).toUpperCase(); // TODO yet not standard distribution
+
+    }
 }
+

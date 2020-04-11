@@ -58,6 +58,11 @@ public class FileTransferProtocol {
 	public static final String DELETE = "DELETE";
 	
 	/**
+	 * TODO hash: hash (as string), file (object as bytes); 
+	 */
+	public static final String HASH = "HASH";
+	
+	/**
 	 * TODO .
 	 */
 	public static final byte[] START_DOWNLOAD = "START".getBytes(); 
@@ -67,6 +72,13 @@ public class FileTransferProtocol {
 	 */
 	public static final byte[] ACK = "ACK".getBytes(); 
 	
+	
+	/**
+	 * TODO to indicate operation on server failed
+	 * TODO implement
+	 */
+	public static final String FAILED = "FAILED";
+
 	
 	/**
 	 * TODO

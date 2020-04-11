@@ -8,6 +8,7 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.file.Path;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -235,6 +236,21 @@ public class FileTransferClientHandler implements Runnable {
 					
 				
 				break;
+				
+			case FileTransferProtocol.HASH:
+				this.showNamedMessage("Client requested to check hash of a file...");
+				try {
+					File fileToCheck = util.Bytes.deserialiseByteArrayToFile(requestBytes); 
+					String hashOnClient = request[1];
+
+					this.checkFile(fileToCheck, hashOnClient);
+				} catch (ClassNotFoundException | IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+					
+				
+				break;
 
 			default:
 				this.showNamedError("Unknow command received"); // what TODO with it?
@@ -386,6 +402,31 @@ public class FileTransferClientHandler implements Runnable {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+	}
+	
+	private void checkFile(File fileToCheck, String hashOnClient) {
+		try {
+			String hashOnServer = util.FileOperations.getHashHexString(fileToCheck);
+
+			byte[] checkFileResponse = (FileTransferProtocol.HASH +
+					FileTransferProtocol.DELIMITER +
+					hashOnServer).getBytes();
+
+			byte[] fileToCheckBytes = util.Bytes.serialiseObjectToByteArray(fileToCheck); 
+
+			this.sendBytesToClient(util.Bytes.concatArray(checkFileResponse, fileToCheckBytes),
+					checkFileResponse.length - 1 + 1); // TODO make this more nice + note offset is string end +1 (note length starts at 1)
+
+			if (hashOnServer.equals(hashOnClient)) {
+				this.showNamedMessage("Local and remote files have the same hash: INTEGRITY OK");
+			} else {
+				this.showNamedMessage("Local and remote files have the different hash: INTEGRITY FAILED");
+			}
+		} catch (NoSuchAlgorithmException | IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
 	}
 	
 	public void sendBytesToClient(byte[] bytesToSend, int byteOffset) { // TODO put in separate utility?

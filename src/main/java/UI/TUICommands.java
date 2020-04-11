@@ -36,4 +36,9 @@ public class TUICommands {
 	 */
 	public static final String DELETE_SINGLE = "delSingle";
 	
+	
+	/**
+	 * TODO .
+	 */
+	public static final String CHECK_INTEGRITY = "check";
 }

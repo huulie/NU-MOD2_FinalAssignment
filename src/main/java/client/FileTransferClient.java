@@ -11,12 +11,14 @@ import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 import UI.TUICommands;
 import exceptions.ExitProgram;
+import exceptions.NoMatchingFileException;
 import exceptions.PacketException;
 import exceptions.UtilByteException;
 import exceptions.UtilDatagramException;
@@ -315,6 +317,14 @@ public class FileTransferClient {
 					// do something
 					this.shutdown();
 					break;
+					
+				case TUICommands.CHECK_INTEGRITY:
+					File fileToCheck = this.selectLocalFile();
+
+					if (!this.checkFile(fileToCheck)) { // TODO clear?
+						this.showNamedError("Checking file failed");
+					}
+					break;
 
 				default:
 					this.showNamedError("Unknow command received"); // what TODO with it?
@@ -379,7 +389,7 @@ public class FileTransferClient {
 			e.printStackTrace();
 		}
 		this.serverFiles = fileArray;
-		this.showNamedMessage("LIST OF FILES: \n" + Arrays.toString(fileArray));
+		this.showNamedMessage("LIST OF FILES: \n" + Arrays.toString(fileArray)); // TODO make nice UI
 		succes = true;
 		
 		return succes;
@@ -452,48 +462,6 @@ public class FileTransferClient {
 //		succes = true;
 				
 		return succes;
-	}
-	
-	public File[] getLocalFiles() {
-		File[] filesArray = new File(this.fileStorage.toString()).listFiles( // TODO only non-hidden
-				new FileFilter() {
-					@Override
-					public boolean accept(File file) {
-						return !file.isHidden();
-					}
-				});
-
-		System.out.println(Arrays.toString(filesArray));
-		return filesArray;
-	}
-	
-	public File selectLocalFile() {
-		File[] localFiles = this.getLocalFiles();
-		
-		int selectedIndex = -1;
-		while (!(selectedIndex >= 0 && selectedIndex < localFiles.length)) {
-			selectedIndex = TUI.getInt("Which index to select?"); 
-		}
-		return localFiles[selectedIndex];
-	}
-	
-	public File selectServerFile() {
-		int selectedIndex = -1;
-		try {
-			this.requestListFiles();
-
-			while (!(selectedIndex >= 0 && selectedIndex < this.serverFiles.length)) {
-				selectedIndex = TUI.getInt("Which index to select?"); 
-			}
-
-		} catch (IOException | PacketException | UtilDatagramException e) {
-			this.showNamedMessage("Something went wrong while refreshing"
-					+ " the server file list: " + e.getLocalizedMessage());
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-
-		return this.serverFiles[selectedIndex];
 	}
 	
 	public boolean uploadSingleFile(File fileToUpload) {
@@ -591,6 +559,176 @@ public class FileTransferClient {
 		}
 		
 		return succes;
+	}
+	
+	public boolean checkFile(File fileToCheck) {
+		boolean succes = false;
+
+		try {
+			boolean sameHash = this.compareLocalRemoteHash(fileToCheck);
+
+			if(sameHash) {
+				this.showNamedMessage("Local and remote files have the same hash: INTEGRITY OK");
+			} else {
+				this.showNamedMessage("Local and remote files have the different hash: INTEGRITY FAILED");
+			}
+
+			succes = true;
+
+		} catch (NoMatchingFileException e) {
+			this.showNamedMessage("Something went wrong while comparing the files: " + e.getLocalizedMessage());
+		}
+
+		return succes;
+	}
+
+	/**
+	 * TODO
+	 * @param fileToCompare
+	 * @return
+	 * @throws NoMatchingFileException 
+	 */
+	public boolean compareLocalRemoteHash(File fileToCompare) throws NoMatchingFileException {
+		boolean sameHash = false; // TODO defult to false??
+		String fileName = fileToCompare.getName(); // TODO search on path plus name?
+
+		try {
+
+			String localHash = util.FileOperations.getHashHexString(fileToCompare);
+
+			String remoteHash = null;
+
+			this.showNamedMessage("Hash of local file: " + localHash);
+
+			File fileOnServer = this.matchToServerFile(fileName);
+
+			if (fileOnServer != null) {
+				byte[] checkFileRequest = (FileTransferProtocol.HASH +
+						FileTransferProtocol.DELIMITER +
+						localHash).getBytes();
+
+				byte[] fileToCheckBytes = util.Bytes.serialiseObjectToByteArray(fileOnServer); 
+
+				this.sendBytesToServer(util.Bytes.concatArray(checkFileRequest, fileToCheckBytes),
+						checkFileRequest.length-1 + 1); // TODO make this more nice + note offset is string end +1 (note length starts at 1)
+
+				// TODO now wait for response, 
+				Packet receivedPacket = this.receiveServerResponse(); // TODO handle null gracefully
+
+				String responseString = receivedPacket.getPayloadString();
+				String[] responseSplit = this.getArguments(responseString);
+				
+				// TODO if null: error and return false
+
+				if (responseSplit[0].contentEquals(FileTransferProtocol.HASH)) {
+					remoteHash = responseSplit[1];
+					this.showNamedMessage("Hash of remote file: " + remoteHash);
+					// TODO keep protocol in mind!
+				}
+
+				if (remoteHash.equals(localHash)) {
+					sameHash = true;
+				} else {
+					sameHash = false;
+				}
+
+			} else {
+				this.showNamedError("Matched file on server is null!"); // TODO something?
+				throw new NoMatchingFileException("Matched file on server is null!");
+			}
+
+		} catch (NoSuchAlgorithmException | IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (NoMatchingFileException e) {
+			this.showNamedError("No matching file on the server to check!"); // TODO also print? 
+			throw new NoMatchingFileException("No matching file found on the server!");
+		}
+
+		return sameHash;
+	}
+	
+	
+	public File[] getLocalFiles() {
+		File[] filesArray = new File(this.fileStorage.toString()).listFiles( // TODO only non-hidden
+				new FileFilter() {
+					@Override
+					public boolean accept(File file) {
+						return !file.isHidden();
+					}
+				});
+
+		System.out.println(Arrays.toString(filesArray));
+		return filesArray;
+	}
+	
+	public File selectLocalFile() {
+		File[] localFiles = this.getLocalFiles();
+		
+		int selectedIndex = -1;
+		while (!(selectedIndex >= 0 && selectedIndex < localFiles.length)) {
+			selectedIndex = TUI.getInt("Which index to select?"); 
+		}
+		return localFiles[selectedIndex];
+	}
+	
+	public File selectServerFile() {
+		int selectedIndex = -1;
+		try {
+			this.requestListFiles();
+
+			while (!(selectedIndex >= 0 && selectedIndex < this.serverFiles.length)) {
+				selectedIndex = TUI.getInt("Which index to select?"); 
+			}
+
+		} catch (IOException | PacketException | UtilDatagramException e) {
+			this.showNamedMessage("Something went wrong while refreshing"
+					+ " the server file list: " + e.getLocalizedMessage());
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		return this.serverFiles[selectedIndex];
+	}
+	
+	public File matchToServerFile(String fileName) throws NoMatchingFileException { // TODO match on other then file name?
+		File fileOnServer = null;
+		
+		try {
+			this.showNamedMessage("Matching local file to file on server...");
+			this.requestListFiles();
+
+		} catch (IOException | PacketException | UtilDatagramException e) {
+			this.showNamedMessage("Something went wrong while communicating with"
+					+ " the server file list: " + e.getLocalizedMessage());
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		List<File> matchesOnServer = new ArrayList<File>();
+		
+		for (int i = 0; i < this.serverFiles.length; i++) {
+			if (this.serverFiles[i].getName().equals(fileName)) {
+				matchesOnServer.add(this.serverFiles[i]);
+			}
+		}
+		
+		if (matchesOnServer.size() <= 0) {
+			this.showNamedError("No matching file found!"); 
+			throw new NoMatchingFileException("No matching file found on the server!");
+		} else if (matchesOnServer.size() == 1) {
+			fileOnServer = matchesOnServer.get(0);
+			this.showNamedMessage("One matching file found: " + fileOnServer);
+		} else { // more matching
+			this.showNamedMessage("Found matches: \n" + Arrays.toString(matchesOnServer.toArray())); // TODO make nice UI
+
+			int selectedIndex = -1;
+			while (!(selectedIndex >= 0 && selectedIndex < this.serverFiles.length)) {
+				selectedIndex = TUI.getInt("Which index is the correct match?"); 
+			}
+			fileOnServer = matchesOnServer.get(selectedIndex);
+		}
+		return fileOnServer;		
 	}
 	
 	public void sendBytesToServer(byte[] bytesToSend, int byteOffset) { // TODO put in seperate utility?
