@@ -207,9 +207,9 @@ public class FileTransferServer implements Runnable {
 
 				System.out.println("DEBUG:"); // TODO
 				System.out.println(Arrays.toString(receivedPacket.getPayload())); // TODO payloadBytes?
-				System.out.println(Arrays.toString(FileTransferProtocol.INIT_SESSION));
+				System.out.println(Arrays.toString(FileTransferProtocol.INIT_SESSION.getBytes()));
 
-				if (Arrays.equals(receivedPacket.getPayload() , (FileTransferProtocol.INIT_SESSION))) {  // TODO payloadBytes?
+				if (Arrays.equals(receivedPacket.getPayload() , (FileTransferProtocol.INIT_SESSION).getBytes())) {  // TODO payloadBytes?
 					// TODO note: different from .equals() for strings!
 					this.handleSessionRequest(receivedPacket);
 				} else {
@@ -256,8 +256,8 @@ public class FileTransferServer implements Runnable {
 			clients.add(handler);
 			
 			int sessionPortNumber = handler.getPort();
-			byte[] initResponse = util.Bytes.concatArray(FileTransferProtocol.INIT_SESSION,
-					(FileTransferProtocol.DELIMITER + sessionPortNumber).getBytes());
+			byte[] initResponse = (FileTransferProtocol.INIT_SESSION +
+					FileTransferProtocol.DELIMITER + sessionPortNumber).getBytes();
 			this.sendBytesToClient(initResponse,
 					sessionInitPacket.getSourceAddress(),
 					sessionInitPacket.getSourcePort(),

@@ -17,6 +17,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import UI.TUICommands;
+import exceptions.EmptyResponseException;
 import exceptions.ExitProgram;
 import exceptions.NoMatchingFileException;
 import exceptions.PacketException;
@@ -342,56 +343,55 @@ public class FileTransferClient {
 	}
 	
 	public boolean requestSession() throws IOException, PacketException, UtilDatagramException {
-		this.sendBytesToServer(FileTransferProtocol.INIT_SESSION,
-				0); // TODO make this more nice
-		
-		this.showNamedMessage("Waiting for server response...");
-		Packet receivedPacket = TransportLayer.receivePacket(this.socket);
-		//byte[] responseBytes = receivedPacket.getPayload(); 
-		
-		String responseString = receivedPacket.getPayloadString();
-		String[] responseSplit = this.getArguments(responseString);
-		
-//		if (Arrays.equals(responseBytes, FileTransferProtocol.INIT_SESSION)) {
-		if (Arrays.equals(responseSplit[0].getBytes(), FileTransferProtocol.INIT_SESSION)) {
-			// TODO note: different from .equals() for strings!
-			this.sessionActive = true;
-//			this.serverPort = receivedPacket.getSourcePort(); // update to clientHandler
-			this.serverPort =  Integer.parseInt(responseSplit[1]); // update to clientHandler
-			this.showNamedMessage("Session started with server port = " + this.serverPort);
-			return true;
-		} else {
-			this.sessionActive = false;
-			this.showNamedError("Invalid response to session init");
-			this.sessionActive = false;
+		try {
+			Packet responsePacket = this.requestServer(FileTransferProtocol.INIT_SESSION);
+			String[] responseSplit = this.getArguments(responsePacket.getPayloadString());
+
+			//		if (Arrays.equals(responseBytes, FileTransferProtocol.INIT_SESSION)) {
+			if (responseSplit[0].equals(FileTransferProtocol.INIT_SESSION)) {
+				// TODO note: different from .equals() for strings!
+				this.sessionActive = true;
+				//			this.serverPort = receivedPacket.getSourcePort(); // update to clientHandler
+				this.serverPort =  Integer.parseInt(responseSplit[1]); // update to clientHandler
+				this.showNamedMessage("Session started with server port = " + this.serverPort);
+				return true;
+			} else {
+				this.sessionActive = false;
+				this.showNamedError("Invalid response to session init");
+				this.sessionActive = false;
+			}
+		} catch (EmptyResponseException e) {
+			this.showNamedError("Response from server was empty: " + e.getLocalizedMessage());
 		}
+
 		return this.sessionActive;
 	}
 	
 	public boolean requestListFiles() throws IOException, PacketException, UtilDatagramException {
-		// TODO: store this info in client?!!
 		boolean succes = false;
-		
-		this.sendBytesToServer(FileTransferProtocol.LIST_FILES.getBytes(),
-				FileTransferProtocol.LIST_FILES.getBytes().length-1+1); // TODO make this more nice + note offset is string end +1 BUT length starts from 1
-
-		File[] fileArray = null; // String[]
-
-		Packet receivedPacket = this.receiveServerResponse(); // TODO handle null gracefully
-		
-		byte[] responseBytes = receivedPacket.getPayloadBytes();
-		this.showNamedMessage("Server response received, now processing...");
 
 		try {
+			File[] fileArray = null; 
+
+			Packet responsePacket = this.requestServer(FileTransferProtocol.LIST_FILES);
+
+			byte[] responseBytes = responsePacket.getPayloadBytes();
+			this.showNamedMessage("Server response received, now processing..."); // TODO or also in requestServer?
+
+
 			fileArray = util.Bytes.deserialiseByteArrayToFileArray(responseBytes);
+
+			this.serverFiles = fileArray;
+			this.showNamedMessage("LIST OF FILES: \n" + Arrays.toString(fileArray)); // TODO make nice UI
+			succes = true;
+
 		} catch (ClassNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+		} catch (EmptyResponseException e) {
+			this.showNamedError("Response from server was empty: " + e.getLocalizedMessage());
 		}
-		this.serverFiles = fileArray;
-		this.showNamedMessage("LIST OF FILES: \n" + Arrays.toString(fileArray)); // TODO make nice UI
-		succes = true;
-		
+
 		return succes;
 	}
 	
@@ -416,21 +416,14 @@ public class FileTransferClient {
 			this.downloads.add(downloadHelper);
 
 			// TODO request file, provide downloaderHelper port
-			byte[] singleFileRequest = (FileTransferProtocol.DOWNLOAD + 
+			String singleFileRequest = FileTransferProtocol.DOWNLOAD + 
 					FileTransferProtocol.DELIMITER + 
-					downloadSocket.getLocalPort()).getBytes(); // + // TODO ask to helper/
-					//FileTransferProtocol.DELIMITER.getBytes());
+					downloadSocket.getLocalPort();
 			
 			byte[] fileToDownloadBytes = util.Bytes.serialiseObjectToByteArray(fileToDownload); 
 			
-			this.sendBytesToServer(util.Bytes.concatArray(singleFileRequest, fileToDownloadBytes),
-					singleFileRequest.length-1 + 1); // TODO make this more nice + note offset is string end +1 (note length starts at 1)
-
-			// TODO now wait for response, with uploadHelper port
-			Packet receivedPacket = this.receiveServerResponse(); // TODO handle null gracefully
-			
-			String responseString = receivedPacket.getPayloadString();
-			String[] responseSplit = this.getArguments(responseString);
+			Packet responsePacket = this.requestServer(singleFileRequest, fileToDownloadBytes);
+			String[] responseSplit = this.getArguments(responsePacket.getPayloadString());
 			
 			if (responseSplit[0].contentEquals(FileTransferProtocol.UPLOAD)) {
 				downloadHelper.setUploaderPort(Integer.parseInt(responseSplit[1])); 
@@ -456,6 +449,8 @@ public class FileTransferClient {
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+		} catch (EmptyResponseException e) {
+			this.showNamedError("Response from server was empty: " + e.getLocalizedMessage());
 		}
 		
 		// TODO actual downloading of file takes place in helper
@@ -482,23 +477,17 @@ public class FileTransferClient {
 			this.uploads.add(uploadHelper);
 
 			// TODO request file, provide uploaderHelper port
-			byte[] singleFileAnnouncement = (FileTransferProtocol.UPLOAD + 
+			String singleFileAnnouncement = FileTransferProtocol.UPLOAD + 
 					FileTransferProtocol.DELIMITER + 
 					uploadSocket.getLocalPort() + 
 					FileTransferProtocol.DELIMITER + 
-					fileSizeToUpload).getBytes(); // + // TODO ask to helper/
+					fileSizeToUpload; // + // TODO ask to helper/
 					//FileTransferProtocol.DELIMITER.getBytes());
 			
 			byte[] fileToUploadBytes = util.Bytes.serialiseObjectToByteArray(fileToUpload); 
 			
-			this.sendBytesToServer(util.Bytes.concatArray(singleFileAnnouncement, fileToUploadBytes),
-					singleFileAnnouncement.length-1 + 1); // TODO make this more nice + note offset is string end +1 (note length starts at 1)
-
-			// TODO now wait for response, with uploadHelper port
-			Packet receivedPacket = this.receiveServerResponse(); // TODO handle null gracefully
-			
-			String responseString = receivedPacket.getPayloadString();
-			String[] responseSplit = this.getArguments(responseString);
+			Packet responsePacket = this.requestServer(singleFileAnnouncement, fileToUploadBytes);
+			String[] responseSplit = this.getArguments(responsePacket.getPayloadString());
 			
 			if (responseSplit[0].contentEquals(FileTransferProtocol.DOWNLOAD)) {
 				uploadHelper.setDownloaderPort(Integer.parseInt(responseSplit[1])); 
@@ -521,6 +510,8 @@ public class FileTransferClient {
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+		} catch (EmptyResponseException e) {
+			this.showNamedError("Response from server was empty: " + e.getLocalizedMessage());
 		}
 		
 		// TODO actual uploading of file takes place in helper
@@ -534,19 +525,12 @@ public class FileTransferClient {
 		
 		this.showNamedMessage("WARNING: this deletes files on server!"); // TODO
 		try {
-			byte[] singleFileDeleteRequest = (FileTransferProtocol.DELETE).getBytes();
-					//FileTransferProtocol.DELIMITER.getBytes());
+			String singleFileDeleteRequest = FileTransferProtocol.DELETE;
 			
 			byte[] fileToDeleteBytes = util.Bytes.serialiseObjectToByteArray(fileToUpload); 
 			
-			this.sendBytesToServer(util.Bytes.concatArray(singleFileDeleteRequest, fileToDeleteBytes),
-					singleFileDeleteRequest.length-1 + 1); // TODO make this more nice + note offset is string end +1 (note length starts at 1)
-
-			// TODO now wait for response, with uploadHelper port
-			Packet receivedPacket = this.receiveServerResponse(); // TODO handle null gracefully
-			
-			String responseString = receivedPacket.getPayloadString();
-			String[] responseSplit = this.getArguments(responseString);
+			Packet responsePacket = this.requestServer(singleFileDeleteRequest, fileToDeleteBytes);
+			String[] responseSplit = this.getArguments(responsePacket.getPayloadString());
 			
 			if (responseSplit[0].contentEquals(FileTransferProtocol.DELETE)) {
 				this.showNamedMessage("File deleted!"); //TODO print more?
@@ -556,6 +540,8 @@ public class FileTransferClient {
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			this.showNamedError("Something went wrong while serialising file object");
+		} catch (EmptyResponseException e) {
+			this.showNamedError("Response from server was empty: " + e.getLocalizedMessage());
 		}
 		
 		return succes;
@@ -576,7 +562,9 @@ public class FileTransferClient {
 			succes = true;
 
 		} catch (NoMatchingFileException e) {
-			this.showNamedMessage("Something went wrong while comparing the files: " + e.getLocalizedMessage());
+			this.showNamedError("Something went wrong while comparing the files: " + e.getLocalizedMessage());
+		} catch (EmptyResponseException e) {
+			this.showNamedError("Response from server was empty: " + e.getLocalizedMessage());
 		}
 
 		return succes;
@@ -587,8 +575,9 @@ public class FileTransferClient {
 	 * @param fileToCompare
 	 * @return
 	 * @throws NoMatchingFileException 
+	 * @throws EmptyResponseException 
 	 */
-	public boolean compareLocalRemoteHash(File fileToCompare) throws NoMatchingFileException {
+	public boolean compareLocalRemoteHash(File fileToCompare) throws NoMatchingFileException, EmptyResponseException {
 		boolean sameHash = false; // TODO defult to false??
 		String fileName = fileToCompare.getName(); // TODO search on path plus name?
 
@@ -603,22 +592,14 @@ public class FileTransferClient {
 			File fileOnServer = this.matchToServerFile(fileName);
 
 			if (fileOnServer != null) {
-				byte[] checkFileRequest = (FileTransferProtocol.HASH +
+				String checkFileRequest = FileTransferProtocol.HASH +
 						FileTransferProtocol.DELIMITER +
-						localHash).getBytes();
+						localHash;
 
 				byte[] fileToCheckBytes = util.Bytes.serialiseObjectToByteArray(fileOnServer); 
 
-				this.sendBytesToServer(util.Bytes.concatArray(checkFileRequest, fileToCheckBytes),
-						checkFileRequest.length-1 + 1); // TODO make this more nice + note offset is string end +1 (note length starts at 1)
-
-				// TODO now wait for response, 
-				Packet receivedPacket = this.receiveServerResponse(); // TODO handle null gracefully
-
-				String responseString = receivedPacket.getPayloadString();
-				String[] responseSplit = this.getArguments(responseString);
-				
-				// TODO if null: error and return false
+				Packet responsePacket = this.requestServer(checkFileRequest, fileToCheckBytes);
+				String[] responseSplit = this.getArguments(responsePacket.getPayloadString());
 
 				if (responseSplit[0].contentEquals(FileTransferProtocol.HASH)) {
 					remoteHash = responseSplit[1];
@@ -731,6 +712,33 @@ public class FileTransferClient {
 		return fileOnServer;		
 	}
 	
+	/**
+	 * TODO
+	 * @param requestString
+	 * @param requestBytes
+	 * @return
+	 * @throws EmptyResponseException 
+	 */
+	public Packet requestServer(String requestString, byte[] requestBytes) throws EmptyResponseException {
+		byte[] requestStringBytes = requestString.getBytes();
+		
+		byte[] bytesToServer = requestStringBytes;
+
+		if (requestBytes != null) {
+			bytesToServer = util.Bytes.concatArray(requestStringBytes, requestBytes);
+		}
+		this.sendBytesToServer(bytesToServer, requestStringBytes.length);
+
+		// TODO now wait for response, 
+		Packet receivedPacket = this.receiveServerResponse(); // TODO handle null gracefully
+
+		if (receivedPacket != null) {
+			return receivedPacket; 
+		} else {
+			throw new EmptyResponseException("Response from server was null");
+		}
+	}
+
 	public void sendBytesToServer(byte[] bytesToSend, int byteOffset) { // TODO put in seperate utility?
 		try { // to construct and send a packet
 			Packet packet = new Packet(
@@ -748,7 +756,7 @@ public class FileTransferClient {
 					this.serverPort
 			); 
 			
-			this.showNamedMessage("Bytes send!");
+			this.showNamedMessage("Bytes send to server!");
 			
 		} catch (UnknownHostException | PacketException e) {
 			// TODO Auto-generated catch block
@@ -763,6 +771,16 @@ public class FileTransferClient {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+	}
+	
+	/**
+	 * TODO
+	 * @param requestString
+	 * @return
+	 * @throws EmptyResponseException
+	 */
+	public Packet requestServer(String requestString) throws EmptyResponseException {
+		return this.requestServer(requestString, null);
 	}
 	
 	/**

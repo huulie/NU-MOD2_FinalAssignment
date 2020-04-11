@@ -35,7 +35,7 @@ public class FileTransferProtocol {
 	/**
 	 * TODO .
 	 */
-	public static final byte[] INIT_SESSION = "INIT".getBytes(); 
+	public static final String INIT_SESSION = "INIT"; 
 	
 	/**
 	 * TODO . only in current directory
