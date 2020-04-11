@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -24,7 +25,7 @@ import server.FileTransferClientHandler;
  * @author huub.lievestro
  *
  */
-public class UploadHelper implements Runnable, util.ITimeoutEventHandler { 
+public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler { 
 
 	/**
 	 * Coonected process TODO
@@ -60,11 +61,6 @@ public class UploadHelper implements Runnable, util.ITimeoutEventHandler {
 	 * TODO
 	 */
 	File fileToRead;
-
-	/**
-	 * Indicating download complete TODO
-	 */
-	private boolean complete;
 
 	/** 
 	 * TODO
@@ -113,6 +109,15 @@ public class UploadHelper implements Runnable, util.ITimeoutEventHandler {
 	private int thresholdResend;
 	
 
+	/**
+	 * Indicating upload complete TODO
+	 */
+	private boolean complete;
+	
+	/**
+	 * TODO indicate if paused or not
+	 */
+	private boolean paused;
 	/** TODO
 	 * @param parent
 	 * @param downloadSocket
@@ -238,13 +243,15 @@ public class UploadHelper implements Runnable, util.ITimeoutEventHandler {
 		while (!(filePointer >= fileContents.length && totalAckPackets == totalPackets)) {
 			// while not (reached end of the file AND all packets are acknowledged)
 
-			if (currentPacketToSend <= LAR + SWS && currentPacketToSend <= totalPackets) { 
+			if ((currentPacketToSend <= LAR + SWS && currentPacketToSend <= totalPackets) 
+				&& !this.paused) { // TODO if paused only listen 
 				this.sendNextPacket();
 			} else {
 				this.listenForAck();
 			}
 		}
 		this.showNamedMessage("Sending completed!"); 
+		this.complete = true;
 	}
 	
 	public void sendNextPacket() {
@@ -291,6 +298,10 @@ public class UploadHelper implements Runnable, util.ITimeoutEventHandler {
 					this.setPacketAck(receivedId);
 					
 					ackReceived = true;
+				} else if (Arrays.equals(receivedPacket.getPayloadBytes(), FileTransferProtocol.PAUSE_DOWNLOAD)) {
+					this.pause();
+				} else if (Arrays.equals(receivedPacket.getPayloadBytes(), FileTransferProtocol.RESUME_DOWNLOAD)) {
+					this.resume();
 				} else {
 					this.showNamedError("Unknown packet received: " 
 							+ new String(receivedPacket.getPayload())); // TODO payload parse?
@@ -423,6 +434,38 @@ public class UploadHelper implements Runnable, util.ITimeoutEventHandler {
 		this.downloaderPort = downloaderPort;
 	}
 
+	
+	public synchronized void pause() {
+		this.paused = true; // TODO downloader will wait and know implicitly; notify explicitly?
+		
+		try {
+			this.uploadSocket.setSoTimeout(1000); // TODO otherwise, will block in .receive and not get local resume
+		} catch (SocketException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} 
+		
+		this.showNamedMessage("=PAUSED");
+	}
+	
+	public synchronized void resume() {
+		this.paused = false; // TODO downloader will wait and know implicitly; notify explicitly?
+		
+		try {
+			this.uploadSocket.setSoTimeout(0); // TODO revert socket to default operation
+		} catch (SocketException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} 
+		
+		this.sendNextPacket(); // TODO otherwise there will be no new ACK, opening sender window
+		
+		this.showNamedMessage("=RESUMED");
+	}
+	
+	public boolean isPaused() {
+		return this.paused;
+	}
 	/**
 	 * TODO cannot override from TUI?
 	 * @param message
@@ -437,5 +480,10 @@ public class UploadHelper implements Runnable, util.ITimeoutEventHandler {
 	 */
 	public void showNamedError(String message) {
 		TUI.showNamedError(this.name, message);
+	}
+	
+	@Override 
+	public String toString() {
+		return this.name;
 	}
 }

@@ -72,6 +72,16 @@ public class FileTransferProtocol {
 	 */
 	public static final byte[] ACK = "ACK".getBytes(); 
 	
+	/**
+	 * TODO .
+	 */
+	public static final byte[] PAUSE_DOWNLOAD = "PAUSE".getBytes(); 
+	
+	/**
+	 * TODO .
+	 */
+	public static final byte[] RESUME_DOWNLOAD = "RESUME".getBytes();
+	
 	
 	/**
 	 * TODO to indicate operation on server failed

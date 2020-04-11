@@ -41,4 +41,24 @@ public class TUICommands {
 	 * TODO .
 	 */
 	public static final String CHECK_INTEGRITY = "check";
+	
+	/**
+	 * TODO .
+	 */
+	public static final String UPLOAD_MANAGER = "upManager";
+	
+	/**
+	 * TODO .
+	 */
+	public static final String DOWNLOAD_MANAGER = "downManager";
+	
+	/**
+	 * TODO .
+	 */
+	public static final String PAUSE = "pause";
+	
+	/**
+	 * TODO .
+	 */
+	public static final String RESUME = "resume";
 }

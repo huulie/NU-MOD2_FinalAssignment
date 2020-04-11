@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,7 +28,7 @@ import me.tongfei.progressbar.*;
  * @author huub.lievestro
  *
  */
-public class DownloadHelper implements Runnable {
+public class DownloadHelper implements Helper, Runnable {
 
 	/**
 	 * Coonected process TODO
@@ -67,6 +69,11 @@ public class DownloadHelper implements Runnable {
 	 * Indicating download complete TODO
 	 */
 	private boolean complete;
+	
+	/**
+	 * TODO indicate if paused or not
+	 */
+	private boolean paused;
 
 	/**
 	 * TODO
@@ -118,6 +125,8 @@ public class DownloadHelper implements Runnable {
 		this.totalFileSize = totalFileSize;
 		this.fileToWrite = fileToWrite;
 		this.complete = false;
+		
+		this.paused = false; 
 		
 		this.TUI = new UI.TUI();
 
@@ -194,6 +203,9 @@ public class DownloadHelper implements Runnable {
 					//this.complete = true; // TODO
 				}
 			}
+		} catch (SocketTimeoutException e) {
+			this.showNamedMessage("Socket timed-out: retry receive");
+			this.receiveBytes();
 		} catch (IOException | PacketException | UtilDatagramException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
@@ -245,6 +257,10 @@ public class DownloadHelper implements Runnable {
 
 	public void sendAck(int idToAck) {
 		this.sendBytesToUploader(idToAck, FileTransferProtocol.ACK);
+		
+		if (this.paused) {
+			this.sendBytesToUploader(idToAck, FileTransferProtocol.PAUSE_DOWNLOAD); // TODO keep this id? 
+		}
 	}
 	
 	public void checkComplete() {
@@ -308,6 +324,39 @@ public class DownloadHelper implements Runnable {
 		this.totalFileSize = totalFileSize;
 	}
 	
+	public synchronized void pause() {
+		this.paused = true;
+		this.sendBytesToUploader(0, FileTransferProtocol.PAUSE_DOWNLOAD); // TODO  id? 
+		
+		try {
+			this.downloadSocket.setSoTimeout(1000); // TODO otherwise, will block in .receive and not transmit local resume
+		} catch (SocketException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} 
+		
+		this.showNamedMessage("=PAUSED");
+	}
+	
+	public synchronized void resume() {
+		this.paused = false;
+		this.sendBytesToUploader(0, FileTransferProtocol.RESUME_DOWNLOAD); // TODO ACK, to resend when lost! 
+		
+		try {
+			this.downloadSocket.setSoTimeout(0); // TODO revert socket to default operation
+		} catch (SocketException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} 
+		
+		this.showNamedMessage("=RESUMED"); // TODO not able to see difference between paused or otherwise non-sending uploader
+		// TODO so not able to resume download from paused uploader: blocking in receive
+	}
+	
+	public boolean isPaused() {
+		return this.paused;
+	}
+	
 	/**
 	 * TODO cannot override from TUI?
 	 * @param message
@@ -322,6 +371,11 @@ public class DownloadHelper implements Runnable {
 	 */
 	public void showNamedError(String message) {
 		TUI.showNamedError(this.name, message);
+	}
+	
+	@Override 
+	public String toString() {
+		return this.name;
 	}
 	
 }

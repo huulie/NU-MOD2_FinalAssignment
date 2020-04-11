@@ -26,6 +26,7 @@ import exceptions.ServerFailureException;
 import exceptions.UtilByteException;
 import exceptions.UtilDatagramException;
 import helpers.DownloadHelper;
+import helpers.Helper;
 import helpers.UploadHelper;
 import network.NetworkLayer;
 import network.Packet;
@@ -84,12 +85,12 @@ public class FileTransferClient {
 	/**
 	 *  List of downloads, one for each connected downloadHelper. 
 	 *  */
-	private List<DownloadHelper> downloads;
+	private List<Helper> downloads; // TODO DownloadHelpers
 	
 	/**
 	 *  List of uploads, one for each connected uploadHelper. 
 	 *  */
-	private List<UploadHelper> uploads;
+	private List<Helper> uploads; // TODO UploadHelper
 	
 	boolean running;
 	
@@ -328,7 +329,19 @@ public class FileTransferClient {
 						this.showNamedError("Checking file failed");
 					}
 					break;
+					
+				case TUICommands.UPLOAD_MANAGER:
+					if (!this.helperManager(this.uploads)) { // TODO clear?
+						this.showNamedError("Upload manager failed!");
+					}
+					break;
 
+				case TUICommands.DOWNLOAD_MANAGER:
+					if (!this.helperManager(this.downloads)) { // TODO clear?
+						this.showNamedError("Upload manager failed!");
+					}
+					break;
+				
 				default:
 					this.showNamedError("Unknow command received"); // what TODO with it?
 			}
@@ -491,7 +504,7 @@ public class FileTransferClient {
 
 			int fileSizeToUpload = (int) fileToUpload.length(); // TODO casting long to int!
 
-			UploadHelper uploadHelper = new UploadHelper(this, uploadSocket, 
+			UploadHelper uploadHelper = new UploadHelper(this, uploadSocket,
 					this.serverAddress, -2, fileSizeToUpload, fileToUpload); 
 			// TODO downloader port unset
 
@@ -658,6 +671,38 @@ public class FileTransferClient {
 		}
 
 		return sameHash;
+	}
+	
+	/**
+	 * TODO
+	 * @param listOfHelpers
+	 * @return
+	 */
+	public boolean helperManager(List<Helper> listOfHelpers) { // TODO , Class<T> typeKey
+		boolean succes = false;
+
+		this.showNamedMessage("Found helpers: \n" + Arrays.toString(listOfHelpers.toArray())); // TODO make nice UI
+
+		int selectedIndex = -1;
+		while (!(selectedIndex >= 0 && selectedIndex < listOfHelpers.size())) {
+			selectedIndex = TUI.getInt("Which helper to select?"); 
+		}
+
+		Helper selectedHelper = listOfHelpers.get(selectedIndex);
+
+		if (selectedHelper.isPaused()) {
+			if (TUI.getBoolean("Would you like to resume this helper?")) {
+				selectedHelper.resume();
+			}
+		} else {
+			if (TUI.getBoolean("Would you like to pause this helper?")) {
+				selectedHelper.pause();
+			}
+		}
+		
+		succes = true; // TODO usefull here?
+
+		return succes;
 	}
 	
 	
