@@ -267,8 +267,12 @@ public class FileTransferServer implements Runnable {
 					+ handler.getPort() + " !"); 
 
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			byte[] failure = (FileTransferProtocol.FAILED + FileTransferProtocol.DELIMITER 
+					+ "Handeling new session failed: " + e.getMessage()).getBytes();
+			this.sendBytesToClient(failure,
+					sessionInitPacket.getSourceAddress(),
+					sessionInitPacket.getSourcePort(),
+					failure.length); 
 		}
 	}
 

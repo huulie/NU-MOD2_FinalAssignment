@@ -21,6 +21,7 @@ import exceptions.EmptyResponseException;
 import exceptions.ExitProgram;
 import exceptions.NoMatchingFileException;
 import exceptions.PacketException;
+import exceptions.ServerFailureException;
 import exceptions.UtilByteException;
 import exceptions.UtilDatagramException;
 import helpers.DownloadHelper;
@@ -307,7 +308,7 @@ public class FileTransferClient {
 					break;
 					
 				case TUICommands.DELETE_SINGLE:
-					File fileToDelete= this.selectServerFile();
+					File fileToDelete = this.selectServerFile();
 
 					if (!this.deleteSingleFile(fileToDelete)) { // TODO clear?
 						this.showNamedError("Deleting file failed");
@@ -362,6 +363,8 @@ public class FileTransferClient {
 			}
 		} catch (EmptyResponseException e) {
 			this.showNamedError("Response from server was empty: " + e.getLocalizedMessage());
+		} catch (ServerFailureException e) {
+			this.showNamedError("FAILURE> " + e.getLocalizedMessage());
 		}
 
 		return this.sessionActive;
@@ -390,6 +393,8 @@ public class FileTransferClient {
 			e.printStackTrace();
 		} catch (EmptyResponseException e) {
 			this.showNamedError("Response from server was empty: " + e.getLocalizedMessage());
+		} catch (ServerFailureException e) {
+			this.showNamedError("FAILURE> " + e.getLocalizedMessage());
 		}
 
 		return succes;
@@ -451,6 +456,8 @@ public class FileTransferClient {
 			e.printStackTrace();
 		} catch (EmptyResponseException e) {
 			this.showNamedError("Response from server was empty: " + e.getLocalizedMessage());
+		} catch (ServerFailureException e) {
+			this.showNamedError("FAILURE> " + e.getLocalizedMessage());
 		}
 		
 		// TODO actual downloading of file takes place in helper
@@ -512,6 +519,8 @@ public class FileTransferClient {
 			e.printStackTrace();
 		} catch (EmptyResponseException e) {
 			this.showNamedError("Response from server was empty: " + e.getLocalizedMessage());
+		} catch (ServerFailureException e) {
+			this.showNamedError("FAILURE> " + e.getLocalizedMessage());
 		}
 		
 		// TODO actual uploading of file takes place in helper
@@ -542,6 +551,8 @@ public class FileTransferClient {
 			this.showNamedError("Something went wrong while serialising file object");
 		} catch (EmptyResponseException e) {
 			this.showNamedError("Response from server was empty: " + e.getLocalizedMessage());
+		} catch (ServerFailureException e) {
+			this.showNamedError("FAILURE> " + e.getLocalizedMessage());
 		}
 		
 		return succes;
@@ -553,7 +564,7 @@ public class FileTransferClient {
 		try {
 			boolean sameHash = this.compareLocalRemoteHash(fileToCheck);
 
-			if(sameHash) {
+			if (sameHash) {
 				this.showNamedMessage("Local and remote files have the same hash: INTEGRITY OK");
 			} else {
 				this.showNamedMessage("Local and remote files have the different hash: INTEGRITY FAILED");
@@ -565,6 +576,8 @@ public class FileTransferClient {
 			this.showNamedError("Something went wrong while comparing the files: " + e.getLocalizedMessage());
 		} catch (EmptyResponseException e) {
 			this.showNamedError("Response from server was empty: " + e.getLocalizedMessage());
+		} catch (ServerFailureException e) {
+			this.showNamedError("FAILURE> " + e.getLocalizedMessage());
 		}
 
 		return succes;
@@ -576,8 +589,9 @@ public class FileTransferClient {
 	 * @return
 	 * @throws NoMatchingFileException 
 	 * @throws EmptyResponseException 
+	 * @throws ServerFailureException 
 	 */
-	public boolean compareLocalRemoteHash(File fileToCompare) throws NoMatchingFileException, EmptyResponseException {
+	public boolean compareLocalRemoteHash(File fileToCompare) throws NoMatchingFileException, EmptyResponseException, ServerFailureException {
 		boolean sameHash = false; // TODO defult to false??
 		String fileName = fileToCompare.getName(); // TODO search on path plus name?
 
@@ -624,6 +638,9 @@ public class FileTransferClient {
 		} catch (NoMatchingFileException e) {
 			this.showNamedError("No matching file on the server to check!"); // TODO also print? 
 			throw new NoMatchingFileException("No matching file found on the server!");
+		} catch (ServerFailureException e) {
+			this.showNamedError(e.getLocalizedMessage()); // TODO also print? 
+			throw new ServerFailureException(e.getLocalizedMessage());
 		}
 
 		return sameHash;
@@ -718,8 +735,9 @@ public class FileTransferClient {
 	 * @param requestBytes
 	 * @return
 	 * @throws EmptyResponseException 
+	 * @throws ServerFailureException 
 	 */
-	public Packet requestServer(String requestString, byte[] requestBytes) throws EmptyResponseException {
+	public Packet requestServer(String requestString, byte[] requestBytes) throws EmptyResponseException, ServerFailureException {
 		byte[] requestStringBytes = requestString.getBytes();
 		
 		byte[] bytesToServer = requestStringBytes;
@@ -732,13 +750,27 @@ public class FileTransferClient {
 		// TODO now wait for response, 
 		Packet receivedPacket = this.receiveServerResponse(); // TODO handle null gracefully
 
-		if (receivedPacket != null) {
-			return receivedPacket; 
-		} else {
+		if (receivedPacket == null) {
 			throw new EmptyResponseException("Response from server was null");
+		} else if (receivedPacket.getPayloadString().startsWith(FileTransferProtocol.FAILED)) {
+			String failureMessage = this.getArguments(receivedPacket.getPayloadString())[1];
+			throw new ServerFailureException("SERVER FAILED: " + failureMessage);
+		} else {
+			return receivedPacket; 
 		}
 	}
 
+	/**
+	 * TODO
+	 * @param requestString
+	 * @return
+	 * @throws EmptyResponseException
+	 * @throws ServerFailureException 
+	 */
+	public Packet requestServer(String requestString) throws EmptyResponseException, ServerFailureException {
+		return this.requestServer(requestString, null);
+	}
+	
 	public void sendBytesToServer(byte[] bytesToSend, int byteOffset) { // TODO put in seperate utility?
 		try { // to construct and send a packet
 			Packet packet = new Packet(
@@ -771,16 +803,6 @@ public class FileTransferClient {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-	}
-	
-	/**
-	 * TODO
-	 * @param requestString
-	 * @return
-	 * @throws EmptyResponseException
-	 */
-	public Packet requestServer(String requestString) throws EmptyResponseException {
-		return this.requestServer(requestString, null);
 	}
 	
 	/**
