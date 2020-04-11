@@ -20,6 +20,7 @@ import UI.TUICommands;
 import exceptions.EmptyResponseException;
 import exceptions.ExitProgram;
 import exceptions.NoMatchingFileException;
+import exceptions.NotEnoughFreeSpaceException;
 import exceptions.PacketException;
 import exceptions.ServerFailureException;
 import exceptions.UtilByteException;
@@ -294,9 +295,9 @@ public class FileTransferClient {
 				case TUICommands.DOWNLOAD_SINGLE:
 					File fileToDownload = this.selectServerFile();
 
-					if (!this.downloadSingleFile(fileToDownload)) { // TODO clear?
-						this.showNamedError("Downloading file failed");
-					}
+						if (!this.downloadSingleFile(fileToDownload)) { // TODO clear?
+							this.showNamedError("Downloading file failed");
+						}
 					break;
 					
 				case TUICommands.UPLOAD_SINGLE:
@@ -404,6 +405,7 @@ public class FileTransferClient {
 	 * TODO
 	 * @param fileToDownload TODO: NOTE this is file as on server, not as to write on client!
 	 * @return
+	 * @throws NotEnoughFreeSpaceException TODO throw or handle internally?
 	 */
 	public boolean downloadSingleFile(File fileToDownload) {
 		boolean succes = false;
@@ -434,10 +436,20 @@ public class FileTransferClient {
 				downloadHelper.setUploaderPort(Integer.parseInt(responseSplit[1])); 
 				// TODO keep protocol in mind!
 				this.showNamedMessage("Uploader is on server port = " + Integer.parseInt(responseSplit[1])); //TODO efficiency
-				downloadHelper.setTotalFileSize(Integer.parseInt(responseSplit[2])); 
-				// TODO keep protocol in mind!
-				this.showNamedMessage("Uploader reports total file size = " + Integer.parseInt(responseSplit[2])+ " bytes"); //TODO efficiency
 				
+				int totalFileSize = Integer.parseInt(responseSplit[2]); 					// TODO keep protocol in mind!
+
+				this.showNamedMessage("Uploader reports total file size = " + totalFileSize + " bytes");
+
+				int freeSpace = (int) this.fileStorage.toFile().getUsableSpace(); // TODO casting long to int!
+				if (freeSpace > totalFileSize) {
+					downloadHelper.setTotalFileSize(totalFileSize); 
+					this.showNamedMessage("Free space remaining after download: " + (freeSpace-totalFileSize) + " bytes");
+				} else {
+					this.downloads.remove(downloadHelper); // TODO need to destroy or can GbCollect?
+					throw new NotEnoughFreeSpaceException(totalFileSize + "bytes don't fit in " + freeSpace + "bytes of free space");
+
+				}
 				
 				// TODO now everything is known: start download helper
 				new Thread(downloadHelper).start();
@@ -458,6 +470,8 @@ public class FileTransferClient {
 			this.showNamedError("Response from server was empty: " + e.getLocalizedMessage());
 		} catch (ServerFailureException e) {
 			this.showNamedError("FAILURE> " + e.getLocalizedMessage());
+		} catch (NotEnoughFreeSpaceException e) {
+			this.showNamedError("Not enough free space to store download"); // TODO handle here?!
 		}
 		
 		// TODO actual downloading of file takes place in helper

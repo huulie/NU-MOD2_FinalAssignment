@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import exceptions.NotEnoughFreeSpaceException;
 import exceptions.PacketException;
 import exceptions.ServerFailureException;
 import exceptions.UtilByteException;
@@ -213,14 +214,23 @@ public class FileTransferClientHandler implements Runnable {
 						int totalFileSize = Integer.parseInt(request[2]);
 						this.showNamedMessage("Uploader reports total file size = " + totalFileSize + " bytes");
 
-
-						this.uploadSingle(fileToDownload, uploaderPort, totalFileSize);
+						int freeSpace = (int) this.fileStorage.toFile().getUsableSpace(); // TODO casting long to int!
+						if (freeSpace > totalFileSize) {
+							this.uploadSingle(fileToDownload, uploaderPort, totalFileSize); // TODO all but this should go into specific method
+							this.showNamedMessage("Free space remaining after upload: " + (freeSpace-totalFileSize) + " bytes");
+						} else {
+							throw new NotEnoughFreeSpaceException(totalFileSize + "bytes don't fit in " + freeSpace + "bytes of free space");
+						}
+						
+						
 					} catch (NumberFormatException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
 					} catch (ClassNotFoundException | IOException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
+					} catch (NotEnoughFreeSpaceException e) {
+						throw new ServerFailureException(e.getLocalizedMessage());
 					}
 
 					break;
