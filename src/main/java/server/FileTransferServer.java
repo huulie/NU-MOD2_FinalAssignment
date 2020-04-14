@@ -412,7 +412,7 @@ public class FileTransferServer implements Runnable {
 	public Path assignClientSandbox(String clientName) {
 		this.showNamedMessage("Server file storage set to: " + this.fileStorage.toString());
 
-		Path sandboxedStorage = root.resolve(clientName);
+		Path sandboxedStorage = this.fileStorage.resolve(clientName);
 		this.showNamedMessage("Client File storage set to: " + sandboxedStorage.toString());
 
 
