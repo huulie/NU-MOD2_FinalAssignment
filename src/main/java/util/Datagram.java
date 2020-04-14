@@ -29,6 +29,10 @@ public class Datagram {
 			throw new UtilDatagramException(e.getLocalizedMessage());
 		}
 		
+		if (id > FileTransferProtocol.MAX_ID) {
+			throw new UtilDatagramException("ID cannot be larger than MAX_ID");
+		}
+		
 		return id;
 	}
 	
@@ -141,6 +145,10 @@ public class Datagram {
 	
 	public static byte[] buildHeader(Packet packet) throws UtilDatagramException {
 		// write file size into the header byte 
+		if (packet.getId() > FileTransferProtocol.MAX_ID) {
+			throw new UtilDatagramException("ID cannot be larger than MAX_ID");
+		}
+		
 		byte[] header;
 		try {
 			byte[] idBytes = util.Bytes.int2ByteArray(packet.getId());

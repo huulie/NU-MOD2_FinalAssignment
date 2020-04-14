@@ -113,6 +113,7 @@ public class FileTransferProtocol {
 			//+ (int) Math.ceil(Math.log(MAX_PACKET_SIZE) / Math.log(2) / 8);
 			+ 3; // TODO the int2Byte always puts in block of 4 bytes
 	
+	
 	/**
 	 * TODO . 
 	 * NOTE: payload length should be encoded with big-endian encoding
@@ -143,6 +144,10 @@ public class FileTransferProtocol {
 	public static final int PAYLOAD_START = TOTAL_HEADER_SIZE; // TODO header size already plus one
 	
 
+	/**
+	 * TODO *8bits per bytes, to power two,  note max capacity of int (all over protocol!!)
+	 */
+	public static final int MAX_ID = (int) Math.pow(2, (double)((HEADER_ID_LAST - HEADER_ID_START) * 8))-1;
 	
 	/**
 	 * TODO .

@@ -68,11 +68,16 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 	private List<Packet> packetList;
 
 	/** 
-	 * TODO
+	 * TODO LAR = LAst Acked Frame, SWS = sliding window size
 	 */
 	private int LAR;
 	private int SWS;
-
+	
+	/**
+	 * TODO will not be limiting: because LAR rtc is int
+	 */
+	private int idWrapCounter;
+	
 	/**
 	 * keep track of where we are in the data TODO
 	 */
@@ -188,8 +193,9 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 		
 		this.waitForInitiate();
 
-		totalAckPackets = 0;
-		currentPacketToSend = 0;
+		this.totalAckPackets = 0;
+		this.currentPacketToSend = 0;
+		this.idWrapCounter = 0; // TODO first zero will set it to zero
 
 		
 		this.showNamedMessage("Starting byte transfer...");
@@ -216,8 +222,8 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 
 		this.totalPackets = (int) Math.ceil(fileContents.length/FileTransferProtocol.MAX_PAYLOAD_LENGTH);
 		this.showNamedMessage("Total number of packets to send: " + this.totalPackets);
-		if (this.totalPackets > 256) {
-			this.showNamedError("!! WARNING THIS IS NOT IMPLEMENTED YET!!");
+		if (this.totalPackets >= FileTransferProtocol.MAX_ID) {
+			this.showNamedMessage("Note: ID wrap around will occur during transmission");
 		}
 	}
 	
@@ -278,7 +284,12 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 	
 	public void sendNextPacket() {
 		// inside send window size = send the packet
-		int packetID = currentPacketToSend;
+		int packetID = currentPacketToSend % FileTransferProtocol.MAX_ID;
+		
+		if (packetID == 0 && currentPacketToSend != 0) {
+			this.idWrapCounter++;
+			this.showNamedMessage("packet ID wrap around"); // TODO debug
+		}
 		
 		this.sendBytesToDownloader(packetID, generatePayload()); 
 		// TODO reduce with instance var: fileContents, filePointer
@@ -286,7 +297,7 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 		filePointer += Math.min(FileTransferProtocol.MAX_PAYLOAD_LENGTH,
 				fileContents.length - filePointer); // datalen
 		
-		this.showNamedMessage("Packet " + packetID + " send..");
+		this.showNamedMessage("Packet " + currentPacketToSend + " with ID = " + packetID + " send..");
 		currentPacketToSend++;
 	}
 	
@@ -315,9 +326,27 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 				if (receivedPacket != null && // TODO null is now bit superfluous
 						Arrays.equals(receivedPacket.getPayloadBytes(), FileTransferProtocol.ACK)) {
 
+					// TODO something with wraparound
 					int receivedId = receivedPacket.getId();
-					LAR = receivedId;
-					this.setPacketAck(receivedId);
+					int unwrappedId = -1; // TODO need to initialize
+
+					int previousWraparoundId = receivedId 
+							+ (this.idWrapCounter - 1) * FileTransferProtocol.MAX_ID;
+					int currentWraparoundId = receivedId 
+							+ (this.idWrapCounter) * FileTransferProtocol.MAX_ID;
+
+					if (! (this.LAR > previousWraparoundId)) { 
+						// check if packet from previous wraparound is already ACKed (= expected earlier) TODO check with Djurre
+						unwrappedId = previousWraparoundId;
+					} else if (this.currentPacketToSend > currentWraparoundId) {
+						// check if packet could be sent in this wraparound (= it possible) TODO check with Djurre
+						unwrappedId = currentWraparoundId;
+					} else {
+						this.showNamedError("Something weird happend while wrapping around packet IDs");
+						this.shutdown();
+					}
+					LAR = unwrappedId;
+					this.setPacketAck(unwrappedId);
 					
 					ackReceived = true;
 				} else if (Arrays.equals(receivedPacket.getPayloadBytes(), FileTransferProtocol.PAUSE_DOWNLOAD)) {
@@ -367,14 +396,15 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 
 	public void setPacketAck(int idToAck) {
 		boolean found = false;
-		for (Packet p : packetList) { 
-			if (p.getId() == idToAck) {
+		//for (Packet p : packetList) { 
+		Packet p = this.packetList.get(idToAck); 
+			if (p.getId() == idToAck % FileTransferProtocol.MAX_ID) { // TODO add modulo to check
 				p.setAck(true);
 				this.showNamedMessage("Packet " + idToAck + " ACKed!");
 				totalAckPackets++;
 				found = true;
 			}
-		}
+		//}
 		if (!found) {
 			this.showNamedError("Packet with ID = " + idToAck + " not found!");
 		}
@@ -507,6 +537,10 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 	}
 	
 	public void shutdown() {
+		if (!this.complete) {
+			this.showNamedError("WARNING! preliminairy shutdown: transfer not complete!");
+		}
+		this.showNamedMessage("Helper is shutting down.");
 		this.uploadSocket.close();
 	}
 	

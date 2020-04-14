@@ -94,10 +94,15 @@ public class DownloadHelper implements Helper, Runnable {
 	private List<Packet> receivedPacketList;
 
 	/**
-	 * TODO
+	 * TODO LFR = lastFrameReceived, RWS = receive window size
 	 */
 	private int LFR;
 	private int RWS;
+	
+	/**
+	 * TODO will not be limiting: because LAR rtc is int
+	 */
+	private int idWrapCounter;
 
 	/**
 	 * 
@@ -156,6 +161,9 @@ public class DownloadHelper implements Helper, Runnable {
 		LFR = -1;
 		RWS = 1;
 		
+		
+		this.idWrapCounter = 0; // TODO only RWS of zero will set it first to zero TODO placement in file1
+
 		/**
 		 * TODO dropped outside windo, not because security
 		 */
@@ -254,22 +262,35 @@ public class DownloadHelper implements Helper, Runnable {
 			return;
 		}
 		
-		int packetID = packet.getId();
+		int receivedId = packet.getId();
+		int unwrappedId = -1; // TODO need to initialize
+		
+		int previousWraparoundId = receivedId 
+				+ (this.idWrapCounter - 1) * FileTransferProtocol.MAX_ID;
+		int currentWraparoundId = receivedId 
+				+ (this.idWrapCounter) * FileTransferProtocol.MAX_ID;
 
-		// get total file size from header // TODO not including in every packet?
-		//  	byte[] totalFileSizeBytes = new byte[MAX_FILE_SIZE_BYTES];
-		//  	for(int i = ID_BYTES; i < MAX_FILE_SIZE_BYTES+ID_BYTES; i++) {
-		//      	totalFileSizeBytes[i-ID_BYTES] = header[i].byteValue();
-		//      	}
-		//      
-		//  	int totalFileSize = ByteBuffer.wrap(totalFileSizeBytes).getInt(); // assuming Big-endian!
-		//  	int totalFileSize = packet.; // get total file size from header
-		//  	this.showNamedMessage("Total file size = " + totalFileSize);
+//		System.out.println("max: " + FileTransferProtocol.MAX_ID); // TODO debug
+//		System.out.println("recvd: " + receivedId); // TODO debug
+//		System.out.println("LFR: " + receivedId); // TODO debug
+		
+		if (! (this.LFR > previousWraparoundId)) { 
+			// check if packet from previous wraparound is already received (= expected earlier) TODO check with Djurre
+			unwrappedId = previousWraparoundId;
+		} else {//if (this.currentPacketToSend > currentWraparoundId) {
+			// TODO no way to know is packet was already sent?!! TODO check with Djurre
+			unwrappedId = currentWraparoundId;
+//		} else {
+//			this.showNamedError("Something weird happend while wrapping around packet IDs");
+//			this.shutdown();
+		}
+//		System.out.println(unwrappedId); // TODO debug
+
 
 		// tell the user
 //		this.showNamedMessage("Received packet " + packetID + ", length="+packet.getPayloadLength()); // TODO debug info
 
-		if (packetID > LFR && packetID <= LFR + RWS) {
+		if (unwrappedId > LFR && unwrappedId <= LFR + RWS) {
 //			this.showNamedMessage("Processing packet " + packetID); // TODO debug info
 			
 			// append the packet's data part (excluding the header) to the fileContents array, first making it larger
@@ -279,21 +300,29 @@ public class DownloadHelper implements Helper, Runnable {
 			System.arraycopy(packet.getPayloadBytes(), 0, fileContents, oldlength, datalen); 
 			// TODO start at beginning payload
 
-			LFR = packetID;
+			LFR = unwrappedId;
 			
-			this.sendAck(packetID);
+			this.sendAck(unwrappedId);
 		} else {
-			this.showNamedMessage("DROPPING packet " + packetID);
+			this.showNamedMessage("DROPPING packet " + receivedId);
 			this.droppedPackets++;
 		}
 
 	}
 
 	public void sendAck(int idToAck) {
-		this.sendBytesToUploader(idToAck, FileTransferProtocol.ACK);
+		int packetID = idToAck % FileTransferProtocol.MAX_ID;
+		
+		int maxIdReceived = (idToAck+RWS) % FileTransferProtocol.MAX_ID; // TODO naming
+		if (maxIdReceived == 0) {
+			this.idWrapCounter++;
+			this.showNamedMessage("packet ID wrap around"); // TODO debug
+		}
+		
+		this.sendBytesToUploader(packetID, FileTransferProtocol.ACK);
 		
 		if (this.paused) {
-			this.sendBytesToUploader(idToAck, FileTransferProtocol.PAUSE_DOWNLOAD); // TODO keep this id? 
+			this.sendBytesToUploader(packetID, FileTransferProtocol.PAUSE_DOWNLOAD); // TODO keep this id? 
 		}
 	}
 	
