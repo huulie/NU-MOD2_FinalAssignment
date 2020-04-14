@@ -35,7 +35,7 @@ public class FileTransferProtocol {
 	/**
 	 * TODO . discover: String Name
 	 */
-	public static final String DISCOVER= "DISCOVER";
+	public static final String DISCOVER = "DISCOVER";
 	
 	/**
 	 * TODO .
@@ -48,22 +48,22 @@ public class FileTransferProtocol {
 	public static final String LIST_FILES = "ls";
 	
 	/**
-	 * TODO download: dowloadHelper port; file (object as bytes); 
+	 * TODO download: dowloadHelper port + file (object as bytes); 
 	 */
 	public static final String DOWNLOAD = "DOWNLOAD";
 	
 	/**
-	 * TODO upload: uploadHelper port, file (object as bytes)  
+	 * TODO upload: uploadHelper port; int startID, file (object as bytes)  
 	 */
 	public static final String UPLOAD = "UPLOAD";
 	
 	/**
-	 * TODO delete: file (object as bytes); 
+	 * TODO delete: file (object as bytes) 
 	 */
 	public static final String DELETE = "DELETE";
 	
 	/**
-	 * TODO hash: hash (as string), file (object as bytes); 
+	 * TODO hash: hash (as string) + file (object as bytes); 
 	 */
 	public static final String HASH = "HASH";
 	

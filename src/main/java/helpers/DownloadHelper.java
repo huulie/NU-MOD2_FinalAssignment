@@ -105,9 +105,14 @@ public class DownloadHelper implements Helper, Runnable {
 	private int idWrapCounter;
 
 	/**
+	 * TODO
+	 */
+	private int startID;
+	
+	/**
 	 * 
 	 */
-	int droppedPackets;
+	private int droppedPackets;
 	
 	/**
 	 * TODO
@@ -125,8 +130,7 @@ public class DownloadHelper implements Helper, Runnable {
 	 * @param initiate TODO update
 	 */
 	public DownloadHelper(Object parent, DatagramSocket downloadSocket, InetAddress uploaderAddress, int uploaderPort,
-			int totalFileSize, File fileToWrite) {
-		super();
+			int totalFileSize, File fileToWrite, int startID) {
 		this.parent = parent;
 		this.downloadSocket = downloadSocket;
 		this.uploaderAddress = uploaderAddress;
@@ -158,9 +162,9 @@ public class DownloadHelper implements Helper, Runnable {
 
 		List<Packet> receivedPacketList = new ArrayList<Packet>();
 
-		LFR = -1;
-		RWS = 1;
-		
+		this.LFR = -1;
+		this.RWS = 1;
+		this.startID = startID; // TODO or set with method and initially assume zero
 		
 		this.idWrapCounter = 0; // TODO only RWS of zero will set it first to zero TODO placement in file1
 
@@ -262,35 +266,13 @@ public class DownloadHelper implements Helper, Runnable {
 			return;
 		}
 		
-		int receivedId = packet.getId();
-		int unwrappedId = -1; // TODO need to initialize
-		
-		int previousWraparoundId = receivedId 
-				+ (this.idWrapCounter - 1) * FileTransferProtocol.MAX_ID;
-		int currentWraparoundId = receivedId 
-				+ (this.idWrapCounter) * FileTransferProtocol.MAX_ID;
-
-//		System.out.println("max: " + FileTransferProtocol.MAX_ID); // TODO debug
-//		System.out.println("recvd: " + receivedId); // TODO debug
-//		System.out.println("LFR: " + receivedId); // TODO debug
-		
-		if (!(this.LFR > previousWraparoundId)) { 
-			// check if packet from previous wraparound is already received (= expected earlier) TODO check with Djurre
-			unwrappedId = previousWraparoundId;
-		} else {//if (this.currentPacketToSend > currentWraparoundId) {
-			// TODO no way to know is packet was already sent?!! TODO check with Djurre
-			unwrappedId = currentWraparoundId;
-//		} else {
-//			this.showNamedError("Something weird happend while wrapping around packet IDs");
-//			this.shutdown();
-		}
-//		System.out.println(unwrappedId); // TODO debug
+		int packetNr = this.IdToNr(packet.getId());
 
 
 		// tell the user
 //		this.showNamedMessage("Received packet " + packetID + ", length="+packet.getPayloadLength()); // TODO debug info
 
-		if (unwrappedId > LFR && unwrappedId <= LFR + RWS) {
+		if (packetNr > LFR && packetNr <= LFR + RWS) {
 //			this.showNamedMessage("Processing packet " + packetID); // TODO debug info
 			
 			// append the packet's data part (excluding the header) to the fileContents array, first making it larger
@@ -300,20 +282,20 @@ public class DownloadHelper implements Helper, Runnable {
 			System.arraycopy(packet.getPayloadBytes(), 0, fileContents, oldlength, datalen); 
 			// TODO start at beginning payload
 
-			LFR = unwrappedId;
+			LFR = packetNr;
 			
-			this.sendAck(unwrappedId);
+			this.sendAck(packetNr);
 		} else {
-			this.showNamedMessage("DROPPING packet " + receivedId);
+			this.showNamedMessage("DROPPING packet " + packet.getId());
 			this.droppedPackets++;
 		}
 
 	}
 
-	public void sendAck(int idToAck) {
-		int packetID = idToAck % FileTransferProtocol.MAX_ID;
+	public void sendAck(int nrToAck) {
+		int packetID = nrToId(nrToAck);
 		
-		int maxIdReceived = (idToAck+RWS) % FileTransferProtocol.MAX_ID; // TODO naming
+		int maxIdReceived = nrToId(nrToAck + RWS) ; // TODO naming
 		if (maxIdReceived == 0) {
 			this.idWrapCounter++;
 			this.showNamedMessage("packet ID wrap around"); // TODO debug
@@ -387,6 +369,11 @@ public class DownloadHelper implements Helper, Runnable {
 		this.totalFileSize = totalFileSize;
 	}
 	
+	public void setStartID(int startID) {
+		this.startID = startID;
+	}
+
+
 	public synchronized void pause() {
 		this.paused = true;
 		this.sendBytesToUploader(0, FileTransferProtocol.PAUSE_DOWNLOAD); // TODO  id? 
@@ -459,5 +446,48 @@ public class DownloadHelper implements Helper, Runnable {
 	public String toString() {
 		return this.name;
 	}
+	
+	// private methods //TODO why make private? TODO or in utility?! >> note static to use intancevar
+	/**
+	 * TODO
+	 * @param packetNumber
+	 * @return
+	 */
+	private int nrToId(int packetNumber) {
+		return (packetNumber + this.startID) % FileTransferProtocol.MAX_ID;
+	}
+	
+	private int IdToNr(int packetID) {
+		int unwrappedId = -1; // TODO need to initialize
+		
+		int correctedId = packetID - this.startID;
+
+		
+		int previousWraparoundRangeID = correctedId 
+				+ (this.idWrapCounter - 1) * FileTransferProtocol.MAX_ID;
+		int currentWraparoundRangeID = correctedId 
+				+ (this.idWrapCounter) * FileTransferProtocol.MAX_ID;
+
+//		System.out.println("max: " + FileTransferProtocol.MAX_ID); // TODO debug
+//		System.out.println("recvd: " + receivedId); // TODO debug
+//		System.out.println("LFR: " + receivedId); // TODO debug
+		
+		if (!(this.LFR > previousWraparoundRangeID)) { 
+			// check if packet from previous wraparound is already received (= expected earlier) TODO check with Djurre
+			unwrappedId = previousWraparoundRangeID;
+		} else {//if (this.currentPacketToSend > currentWraparoundId) {
+			// TODO no way to know is packet was already sent?!! TODO check with Djurre
+			unwrappedId = currentWraparoundRangeID;
+//		} else {
+//			this.showNamedError("Something weird happend while wrapping around packet IDs");
+//			this.shutdown();
+		}
+//		System.out.println(unwrappedId); // TODO debug
+		
+		//return unwrappedId - this.startID; // TODO ????
+		return unwrappedId; // TODO ????
+
+	}
+	
 	
 }

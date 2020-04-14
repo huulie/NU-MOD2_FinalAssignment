@@ -510,7 +510,7 @@ public class FileTransferClient {
 			DatagramSocket downloadSocket = TransportLayer.openNewDatagramSocket();
 			
 			DownloadHelper downloadHelper = new DownloadHelper(this,
-					downloadSocket, this.serverAddress, -2, -1, fileToWrite); // TODO unset port uploader and fileSize
+					downloadSocket, this.serverAddress, -2, -1, fileToWrite, -1); // TODO unset port uploader and fileSize
 			// TODO uploaderPort still to set
 			this.downloads.add(downloadHelper);
 
@@ -530,9 +530,8 @@ public class FileTransferClient {
 				this.showNamedMessage("Uploader is on server port = " + Integer.parseInt(responseSplit[1])); //TODO efficiency
 				
 				int totalFileSize = Integer.parseInt(responseSplit[2]); 					// TODO keep protocol in mind!
-
 				this.showNamedMessage("Uploader reports total file size = " + totalFileSize + " bytes");
-
+				
 				int freeSpace = (int) this.fileStorage.toFile().getUsableSpace(); // TODO casting long to int!
 				if (freeSpace > totalFileSize) {
 					downloadHelper.setTotalFileSize(totalFileSize); 
@@ -542,6 +541,10 @@ public class FileTransferClient {
 					throw new NotEnoughFreeSpaceException(totalFileSize + "bytes don't fit in " + freeSpace + "bytes of free space");
 
 				}
+				
+				int startID = Integer.parseInt(responseSplit[3]); 					// TODO keep protocol in mind!
+				this.showNamedMessage("Uploader starts at ID" + startID);
+				downloadHelper.setStartID(startID);
 				
 				// TODO now everything is known: start download helper
 				new Thread(downloadHelper).start();
@@ -594,7 +597,9 @@ public class FileTransferClient {
 					FileTransferProtocol.DELIMITER + 
 					uploadSocket.getLocalPort() + 
 					FileTransferProtocol.DELIMITER + 
-					fileSizeToUpload; // + // TODO ask to helper/
+					fileSizeToUpload +
+					FileTransferProtocol.DELIMITER + 
+					uploadHelper.getStartId(); // + // TODO ask to helper/
 					//FileTransferProtocol.DELIMITER.getBytes());
 			
 			byte[] fileToUploadBytes = util.Bytes.serialiseObjectToByteArray(fileToUpload); 

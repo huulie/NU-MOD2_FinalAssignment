@@ -9,6 +9,7 @@ import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 
 import client.FileTransferClient;
 import exceptions.PacketException;
@@ -77,6 +78,11 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 	 * TODO will not be limiting: because LAR rtc is int
 	 */
 	private int idWrapCounter;
+	
+	/*
+	 * TODO
+	 */
+	private int startID;
 	
 	/**
 	 * keep track of where we are in the data TODO
@@ -176,9 +182,11 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 
 		this.packetList = new ArrayList<Packet>();
 
-		LAR = -1;
-		SWS = 1;
+		this.LAR = -1;
+		this.SWS = 1;
 
+		this.startID = new Random().nextInt((FileTransferProtocol.MAX_ID) + 1); // zero to max_ID
+		
 		this.totalResendPackets = 0;
 		this.thresholdResend = 25; // TODO explain in report!
 		
@@ -195,7 +203,7 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 
 		this.totalAckPackets = 0;
 		this.currentPacketToSend = 0;
-		this.idWrapCounter = 0; // TODO first zero will set it to zero
+		this.idWrapCounter = 0;
 
 		
 		this.showNamedMessage("Starting byte transfer...");
@@ -284,7 +292,7 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 	
 	public void sendNextPacket() {
 		// inside send window size = send the packet
-		int packetID = currentPacketToSend % FileTransferProtocol.MAX_ID;
+		int packetID = nrToId(currentPacketToSend);
 		
 		if (packetID == 0 && currentPacketToSend != 0) {
 			this.idWrapCounter++;
@@ -326,29 +334,13 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 				if (receivedPacket != null && // TODO null is now bit superfluous
 						Arrays.equals(receivedPacket.getPayloadBytes(), FileTransferProtocol.ACK)) {
 
-					// TODO something with wraparound
-					int receivedId = receivedPacket.getId();
-					int unwrappedId = -1; // TODO need to initialize
-
-					int previousWraparoundId = receivedId 
-							+ (this.idWrapCounter - 1) * FileTransferProtocol.MAX_ID;
-					int currentWraparoundId = receivedId 
-							+ (this.idWrapCounter) * FileTransferProtocol.MAX_ID;
-
-					if (! (this.LAR > previousWraparoundId)) { 
-						// check if packet from previous wraparound is already ACKed (= expected earlier) TODO check with Djurre
-						unwrappedId = previousWraparoundId;
-					} else if (this.currentPacketToSend > currentWraparoundId) {
-						// check if packet could be sent in this wraparound (= it possible) TODO check with Djurre
-						unwrappedId = currentWraparoundId;
-					} else {
-						this.showNamedError("Something weird happend while wrapping around packet IDs");
-						this.shutdown();
-					}
-					LAR = unwrappedId;
-					this.setPacketAck(unwrappedId);
+					int packetNr = this.IdToNr(receivedPacket.getId());
+					
+					LAR = packetNr;
+					this.setPacketAck(packetNr);
 					
 					ackReceived = true;
+				
 				} else if (Arrays.equals(receivedPacket.getPayloadBytes(), FileTransferProtocol.PAUSE_DOWNLOAD)) {
 					this.pause();
 				} else if (Arrays.equals(receivedPacket.getPayloadBytes(), FileTransferProtocol.RESUME_DOWNLOAD)) {
@@ -394,19 +386,19 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 		return payload;
 	}
 
-	public void setPacketAck(int idToAck) {
+	public void setPacketAck(int nrToAck) {
 		boolean found = false;
 		//for (Packet p : packetList) { 
-		Packet p = this.packetList.get(idToAck); 
-			if (p.getId() == idToAck % FileTransferProtocol.MAX_ID) { // TODO add modulo to check
+		Packet p = this.packetList.get(nrToAck); 
+			if (p.getId() == nrToId(nrToAck)) { // TODO to check ?
 				p.setAck(true);
-				this.showNamedMessage("Packet " + idToAck + " ACKed!");
+				this.showNamedMessage("Packet " + nrToAck + " ACKed!");
 				totalAckPackets++;
 				found = true;
 			}
 		//}
 		if (!found) {
-			this.showNamedError("Packet with ID = " + idToAck + " not found!");
+			this.showNamedError("Packet with number " + nrToAck + " not found!");
 		}
 	}
 
@@ -455,7 +447,7 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 		Packet packet = (Packet) tag;
 		if (!packet.isAck()) {
 			//Thread.interrupt();// TODO how to get thread to resend while waiting on this ACK?
-			this.showNamedMessage("TIME OUT packet " + packet.getId() + " without ACK: resend!");
+			this.showNamedMessage("TIME OUT packet with ID = " + packet.getId() + " without ACK: resend!");
 			sendPacketToDownloader(packet);
 			 this.restrictResend(packet);
 		}
@@ -545,6 +537,10 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 	}
 	
 	
+	public int getStartId() {
+		return startID;
+	}
+
 	/**
 	 * TODO cannot override from TUI?
 	 * @param message
@@ -564,5 +560,40 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 	@Override 
 	public String toString() {
 		return this.name;
+	}
+	
+	// private methods //TODO why make private? TODO or in utility?! >> note static to use intancevar
+	/**
+	 * TODO
+	 * @param packetNumber
+	 * @return
+	 */
+	private int nrToId(int packetNumber) {
+		return (packetNumber + this.startID) % FileTransferProtocol.MAX_ID;
+	}
+
+	private int IdToNr(int packetID) {
+		int unwrappedId = -1; // TODO need to initialize
+
+		int correctedId = packetID - this.startID;
+		
+		int previousWraparoundRangeID = correctedId 
+				+ (this.idWrapCounter - 1) * FileTransferProtocol.MAX_ID;
+		int currentWraparoundRangeID = correctedId 
+				+ (this.idWrapCounter) * FileTransferProtocol.MAX_ID;
+
+		if (!(this.LAR > previousWraparoundRangeID)) { 
+			// check if packet from previous wraparound is already ACKed (= expected earlier)
+			unwrappedId = previousWraparoundRangeID;
+		} else if (this.currentPacketToSend > currentWraparoundRangeID) {
+			// check if packet could be sent in this wraparound (= it possible)
+			unwrappedId = currentWraparoundRangeID;
+		} else {
+			this.showNamedError("Something weird happend while wrapping around packet IDs");
+			this.shutdown();
+		}
+
+		//return unwrappedId - this.startID; // TODO ????
+		return unwrappedId; // TODO ????
 	}
 }

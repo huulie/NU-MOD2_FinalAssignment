@@ -214,10 +214,14 @@ public class FileTransferClientHandler implements Runnable {
 
 						int totalFileSize = Integer.parseInt(request[2]);
 						this.showNamedMessage("Uploader reports total file size = " + totalFileSize + " bytes");
+						
+						int startID = Integer.parseInt(request[3]);
+						this.showNamedMessage("Uploader starts at ID " + startID);
+
 
 						int freeSpace = (int) this.fileStorage.toFile().getUsableSpace(); // TODO casting long to int!
 						if (freeSpace > totalFileSize) {
-							this.uploadSingle(fileToDownload, uploaderPort, totalFileSize); // TODO all but this should go into specific method
+							this.uploadSingle(fileToDownload, uploaderPort, totalFileSize, startID); // TODO all but this should go into specific method
 							this.showNamedMessage("Free space remaining after upload: " + (freeSpace-totalFileSize) + " bytes");
 						} else {
 							throw new NotEnoughFreeSpaceException(totalFileSize + "bytes don't fit in " + freeSpace + "bytes of free space");
@@ -351,7 +355,9 @@ public class FileTransferClientHandler implements Runnable {
 					FileTransferProtocol.DELIMITER +
 					uploadSocket.getLocalPort() + // TODO ask to helper/?
 					FileTransferProtocol.DELIMITER + 
-					fileSizeToUpload).getBytes();
+					fileSizeToUpload +
+					FileTransferProtocol.DELIMITER + 
+					uploadHelper.getStartId()).getBytes();
 
 			byte[] fileToUploadBytes = util.Bytes.serialiseObjectToByteArray(fileToUpload);
 
@@ -364,14 +370,14 @@ public class FileTransferClientHandler implements Runnable {
 		} 
 	}
 
-	public void uploadSingle(File fileToDownload, int uploaderPort, int totalFileSize) throws ServerFailureException {
+	public void uploadSingle(File fileToDownload, int uploaderPort, int totalFileSize, int startID) throws ServerFailureException {
 		// create uploader helper with file and port from request
 
 		try {
 			DatagramSocket downloadSocket = TransportLayer.openNewDatagramSocket();
 
 			DownloadHelper downloadHelper = new DownloadHelper(this, downloadSocket, 
-					this.clientAddress, uploaderPort, totalFileSize, fileToDownload);
+					this.clientAddress, uploaderPort, totalFileSize, fileToDownload, startID);
 
 			this.downloads.add(downloadHelper);
 
