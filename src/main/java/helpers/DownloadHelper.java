@@ -274,7 +274,7 @@ public class DownloadHelper implements Helper, Runnable {
 //		System.out.println("recvd: " + receivedId); // TODO debug
 //		System.out.println("LFR: " + receivedId); // TODO debug
 		
-		if (! (this.LFR > previousWraparoundId)) { 
+		if (!(this.LFR > previousWraparoundId)) { 
 			// check if packet from previous wraparound is already received (= expected earlier) TODO check with Djurre
 			unwrappedId = previousWraparoundId;
 		} else {//if (this.currentPacketToSend > currentWraparoundId) {

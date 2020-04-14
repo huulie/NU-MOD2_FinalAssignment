@@ -362,7 +362,7 @@ public class FileTransferServer implements Runnable {
 			clientFileStorage = this.fileStorage;
 		} else { 
 			//		clientFileStorage = clientStorage // TODO implement as key-value pairs
-			this.showNamedMessage("Client [" + clientName + "]=> Sandboxing: access to server storage denied");
+			this.showNamedMessage("Client [" + clientName + "]=> Sandboxing: access to server fileStorage denied");
 			clientFileStorage = this.sandboxStorages.get(clientName);
 		}
 
