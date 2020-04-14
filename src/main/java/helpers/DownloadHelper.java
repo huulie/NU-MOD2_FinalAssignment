@@ -7,6 +7,8 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -74,6 +76,17 @@ public class DownloadHelper implements Helper, Runnable {
 	 * TODO indicate if paused or not
 	 */
 	private boolean paused;
+	
+	/**
+	 * (re)start time
+	 */
+	long startTime;
+	
+	
+	/**
+	 * Duration of transfer, in nanoseconds
+	 */
+	long duration;
 
 	/**
 	 * TODO
@@ -86,6 +99,11 @@ public class DownloadHelper implements Helper, Runnable {
 	private int LFR;
 	private int RWS;
 
+	/**
+	 * 
+	 */
+	int droppedPackets;
+	
 	/**
 	 * TODO
 	 */
@@ -127,6 +145,9 @@ public class DownloadHelper implements Helper, Runnable {
 		this.complete = false;
 		
 		this.paused = false; 
+		//this.startTime = LocalDateTime.now(); TODO
+		this.startTime = System.nanoTime();
+		this.duration = 0;
 		
 		this.TUI = new UI.TUI();
 
@@ -134,6 +155,13 @@ public class DownloadHelper implements Helper, Runnable {
 
 		LFR = -1;
 		RWS = 1;
+		
+		/**
+		 * TODO dropped outside windo, not because security
+		 */
+		this.droppedPackets = 0;
+		
+	
 
 		// create the array that will contain the file contents
 		// note: we don't know yet how large the file will be, so the easiest (but not most efficient)
@@ -175,6 +203,11 @@ public class DownloadHelper implements Helper, Runnable {
 
 		this.showNamedMessage("File received completely");
 		this.writeFile();
+		this.duration += System.nanoTime() - this.startTime;
+		this.showStats();
+		this.showNamedMessage("Download complete: helper shutting down");
+		this.shutdown();
+		
 
 	}
 
@@ -251,6 +284,7 @@ public class DownloadHelper implements Helper, Runnable {
 			this.sendAck(packetID);
 		} else {
 			this.showNamedMessage("DROPPING packet " + packetID);
+			this.droppedPackets++;
 		}
 
 	}
@@ -327,6 +361,7 @@ public class DownloadHelper implements Helper, Runnable {
 	public synchronized void pause() {
 		this.paused = true;
 		this.sendBytesToUploader(0, FileTransferProtocol.PAUSE_DOWNLOAD); // TODO  id? 
+		this.duration += System.nanoTime() - this.startTime;
 		
 		try {
 			this.downloadSocket.setSoTimeout(1000); // TODO otherwise, will block in .receive and not transmit local resume
@@ -341,6 +376,7 @@ public class DownloadHelper implements Helper, Runnable {
 	public synchronized void resume() {
 		this.paused = false;
 		this.sendBytesToUploader(0, FileTransferProtocol.RESUME_DOWNLOAD); // TODO ACK, to resend when lost! 
+		this.startTime = System.nanoTime(); // restart timer
 		
 		try {
 			this.downloadSocket.setSoTimeout(0); // TODO revert socket to default operation
@@ -371,6 +407,23 @@ public class DownloadHelper implements Helper, Runnable {
 	 */
 	public void showNamedError(String message) {
 		TUI.showNamedError(this.name, message);
+	}
+	
+	public void showStats() {
+		this.showNamedMessage("Transferred file: " + fileToWrite.getName());
+		this.showNamedMessage("Transfer complete: " + this.complete);
+		this.showNamedMessage("-------------------------------->");
+		this.showNamedMessage("Total file size: " + this.totalFileSize + " bytes");
+		this.showNamedMessage("Transfer duration: " + this.duration + " nanoseconds"); // TODO units
+		this.showNamedMessage("Average transferspeed: " + (this.totalFileSize / this.duration) + " bytes/nanosec"); // TODO units?
+		this.showNamedMessage("Number of dropped packets: " + this.droppedPackets);
+		this.showNamedMessage("--------------------------------<");
+
+
+	}
+	
+	public void shutdown() {
+		this.downloadSocket.close();
 	}
 	
 	@Override 

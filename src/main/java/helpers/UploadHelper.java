@@ -118,6 +118,18 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 	 * TODO indicate if paused or not
 	 */
 	private boolean paused;
+	
+	/**
+	 * (re)start time
+	 */
+	long startTime;
+	
+	
+	/**
+	 * Duration of transfer, in nanoseconds
+	 */
+	long duration;
+	
 	/** TODO
 	 * @param parent
 	 * @param downloadSocket
@@ -136,10 +148,10 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 		//this.waitForInitiate = waitForInitiate;
 		if (parent instanceof FileTransferClient) { // TODO or just input manually?
 			this.waitForInitiate = false;
-			this.name = ((FileTransferClient) parent).getName() + "_Downloader-" + fileToRead.getName();
+			this.name = ((FileTransferClient) parent).getName() + "Uploader-" + fileToRead.getName();
 		} else if (parent instanceof FileTransferClientHandler) {
 			this.waitForInitiate = true;
-			this.name = ((FileTransferClientHandler) parent).getName() + "_Downloader-" + fileToRead.getName();
+			this.name = ((FileTransferClientHandler) parent).getName() + "Uploader-" + fileToRead.getName();
 		} else {
 			this.name = "Uploader-" + fileToRead.getName();
 			this.showNamedError("Unknown parent object type!");
@@ -149,6 +161,10 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 		this.totalFileSize = totalFileSize;
 		this.fileToRead = fileToRead;
 		this.complete = false;
+		this.paused = false;
+		
+		this.startTime = System.nanoTime();
+		this.duration = 0;
 		
 		this.TUI = new UI.TUI();
 		
@@ -178,6 +194,12 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 		
 		this.showNamedMessage("Starting byte transfer...");
 		this.transferBytes();
+		this.showNamedMessage("File send completely");
+		this.duration += System.nanoTime() - this.startTime;
+		this.showStats();
+		this.showNamedMessage("Upload complete: helper shutting down");
+		this.shutdown();
+
 		
 	}
 
@@ -437,6 +459,8 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 	
 	public synchronized void pause() {
 		this.paused = true; // TODO downloader will wait and know implicitly; notify explicitly?
+		this.duration += System.nanoTime() - this.startTime;
+
 		
 		try {
 			this.uploadSocket.setSoTimeout(1000); // TODO otherwise, will block in .receive and not get local resume
@@ -450,6 +474,8 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 	
 	public synchronized void resume() {
 		this.paused = false; // TODO downloader will wait and know implicitly; notify explicitly?
+		this.startTime = System.nanoTime(); // restart timer
+
 		
 		try {
 			this.uploadSocket.setSoTimeout(0); // TODO revert socket to default operation
@@ -466,6 +492,25 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 	public boolean isPaused() {
 		return this.paused;
 	}
+	
+	public void showStats() {
+		this.showNamedMessage("Transferred file: " + fileToRead.getName());
+		this.showNamedMessage("Transfer complete: " + this.complete);
+		this.showNamedMessage("-------------------------------->");
+		this.showNamedMessage("Total file size: " + this.totalFileSize + " bytes");
+		this.showNamedMessage("Transfer duration: " + this.duration + " nanoseconds"); // TODO units
+		this.showNamedMessage("Average transferspeed: " + (this.totalFileSize / this.duration) + " bytes/nanosec"); // TODO units?
+		this.showNamedMessage("Number of resend packets: " + this.totalResendPackets);
+		this.showNamedMessage("--------------------------------<");
+
+
+	}
+	
+	public void shutdown() {
+		this.uploadSocket.close();
+	}
+	
+	
 	/**
 	 * TODO cannot override from TUI?
 	 * @param message
