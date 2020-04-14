@@ -24,6 +24,11 @@ public class TUICommands {
 	/**
 	 * TODO .
 	 */
+	public static final String LIST_FILES_LOCAL = "lsLocal";
+	
+	/**
+	 * TODO .
+	 */
 	public static final String DOWNLOAD_SINGLE = "downSingle";
 	
 	/**

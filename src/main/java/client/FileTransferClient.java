@@ -295,6 +295,14 @@ public class FileTransferClient {
 						this.showNamedError("Retrieving list of files failed");
 					}
 					break;
+					
+				case TUICommands.LIST_FILES_LOCAL: 
+					this.showNamedMessage("Making list of local files...");
+//					if (!this.requestListFilesLOCAL()) { // TODO clear?
+//						this.showNamedError("Retrieving list of files failed");
+//					}
+					this.showNamedMessage(Arrays.toString(this.getLocalFiles()));
+					break;
 
 				case TUICommands.DOWNLOAD_SINGLE:
 					File fileToDownload = this.selectServerFile();
