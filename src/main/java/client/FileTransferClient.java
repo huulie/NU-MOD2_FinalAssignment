@@ -114,7 +114,10 @@ public class FileTransferClient {
 		this.downloads = new ArrayList<>();
 		this.uploads = new ArrayList<>();
 		
-		name = "FTClient"; // TODO fixed name, let user set it?
+//		name = "FTClient"; // TODO fixed name, let user set it?
+		while (this.name == null || this.name.isBlank()) {
+			this.name = TUI.getString("What is the name of this client?");
+		}
 
 		// Do setup
 		boolean setupSucces = false;
@@ -359,7 +362,11 @@ public class FileTransferClient {
 	
 	public boolean requestSession() throws IOException, PacketException, UtilDatagramException {
 		try {
-			Packet responsePacket = this.requestServer(FileTransferProtocol.INIT_SESSION);
+			String sessionRequest = FileTransferProtocol.INIT_SESSION 
+					+ FileTransferProtocol.DELIMITER 
+					+ this.name;
+			
+			Packet responsePacket = this.requestServer(sessionRequest);
 			String[] responseSplit = this.getArguments(responsePacket.getPayloadString());
 
 			//		if (Arrays.equals(responseBytes, FileTransferProtocol.INIT_SESSION)) {

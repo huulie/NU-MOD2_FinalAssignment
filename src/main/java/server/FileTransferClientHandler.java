@@ -89,7 +89,8 @@ public class FileTransferClientHandler implements Runnable {
 		this.name = name;
 
 		this.server = server;
-		this.fileStorage = server.getFileStorage("all"); // TODO for now hardcoded
+		
+		this.fileStorage = server.getFileStorage(this.name); // TODO for now hardcoded
 
 		this.downloads = new ArrayList<>();
 		this.uploads = new ArrayList<>();
@@ -302,13 +303,20 @@ public class FileTransferClientHandler implements Runnable {
 		//	        String[]  filesArray = stream.toArray();//stream.toArray(String[]::new);
 		// TODO do without files?
 
-		File[] filesArray = new File(this.fileStorage.toString()).listFiles( // TODO only non-hidden
-				new FileFilter() {
-					@Override
-					public boolean accept(File file) {
-						return !file.isHidden();
-					}
-				});
+		File[] filesArray;
+		try {
+			filesArray = new File(this.fileStorage.toString()).listFiles( // TODO only non-hidden
+					new FileFilter() {
+						@Override
+						public boolean accept(File file) {
+							return !file.isHidden();
+						}
+					});
+		} catch (NullPointerException e) {
+			this.showNamedError("Storage directory may not exist or does contains any files: returning empty array");
+			filesArray = new File[0];
+		}
+		
 		System.out.println(Arrays.toString(filesArray));
 		// https://stackoverflow.com/questions/14669820/how-to-convert-a-string-array-to-a-byte-array-java
 		try {
@@ -483,7 +491,7 @@ public class FileTransferClientHandler implements Runnable {
 	 * @param message
 	 */
 	public void showNamedMessage(String message) {
-		TUI.showNamedMessage(this.name, message);
+		TUI.showNamedMessage("handler-" + this.name, message);
 	}
 
 	/**
@@ -491,7 +499,7 @@ public class FileTransferClientHandler implements Runnable {
 	 * @param message
 	 */
 	public void showNamedError(String message) {
-		TUI.showNamedError(this.name, message);
+		TUI.showNamedError("handler-" + this.name, message);
 	}
 
 }
