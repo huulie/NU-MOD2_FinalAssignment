@@ -33,6 +33,11 @@ public class FileTransferProtocol {
 	public static final int DEFAULT_SERVER_PORT = 4567; 
 	
 	/**
+	 * TODO . discover: String Name
+	 */
+	public static final String DISCOVER= "DISCOVER";
+	
+	/**
 	 * TODO .
 	 */
 	public static final String INIT_SESSION = "INIT"; 

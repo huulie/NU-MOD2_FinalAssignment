@@ -66,6 +66,11 @@ public class FileTransferClient {
 	 */
 	int serverPort;
 	
+	/**
+	 * 
+	 */
+	private String serverName;
+	
 	/** The TUI of this FileTransferServer. */
 	private UI.TUI TUI; 
 	
@@ -120,14 +125,14 @@ public class FileTransferClient {
 		}
 
 		// Do setup
-		boolean setupSucces = false;
-		while (!setupSucces) {
+		boolean setupSuccess = false;
+		while (!setupSuccess) {
 			try {
-				setupSucces = this.setup();
+				setupSuccess = this.setup();
 			} catch (exceptions.ExitProgram eExit) {
 				// If setup() throws an ExitProgram exception, stop the program.
 				if (!TUI.getBoolean("Do you want to retry setup?")) {
-					setupSucces = false;
+					setupSuccess = false;
 				}
 			}
 		}
@@ -229,20 +234,21 @@ public class FileTransferClient {
 	public boolean setServer() { //(InetAddress serverAdress, int serverPort) {
 		boolean success = false;
 		
-//		String serverName = "nvc4122.nedap.local";
-		String serverName = "nu-pi-huub";
-		
-		try {
-			this.serverAddress = NetworkLayer.getAdressByName(serverName); // TODO let user set server
-			success = true;
-		} catch (UnknownHostException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} 
 		this.serverPort = FileTransferProtocol.DEFAULT_SERVER_PORT;
 		
-		this.showNamedMessage("Server set to " + serverName + ", with address " +
+		boolean searchByHostName = TUI.getBoolean("Do you want to search by hostname? "
+				+ "(if not, client will try multicast search)" );
+		
+		if (searchByHostName) {
+			success = this.findServerByHostName();
+		} else {
+			success = this.discoverServer();
+		}
+		
+		if (success) {
+		this.showNamedMessage("Server set to " + this.serverName + ", with address " +
 				this.serverAddress + " and port " + this.serverPort);
+		}
 		
 		return success;
 	}
@@ -261,7 +267,60 @@ public class FileTransferClient {
 		return this.sessionActive;
 	}
 	
+	public boolean findServerByHostName() {
+		boolean success = false;
+//		String serverName = "nvc4122.nedap.local";
+//		String serverName = "nu-pi-huub";
+		this.serverName = TUI.getString("What is the hostname of the server?");
+		
+		try {
+			this.serverAddress = NetworkLayer.getAdressByName(this.serverName); 
+			success = true;
+		} catch (UnknownHostException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} 
+		return success;
+	}
 	
+	public boolean discoverServer() {
+		boolean success = false;
+		
+		this.showNamedMessage("Note: if >1 server responds to DISCOVER, "
+				+ "only the first (and probably fastest) one will be learned");  // TODO formulation
+		
+		try {
+			this.socket.setBroadcast(true);
+			String discoverBroadcast = FileTransferProtocol.DISCOVER 
+					+ FileTransferProtocol.DELIMITER + this.name;
+			
+			InetAddress broadcast = NetworkLayer.getAdressByName("255.255.255.255");
+			this.serverAddress = broadcast; // TODO or NetworkInterface .getBroadcast()
+		
+			Packet serverResponse = this.requestServer(discoverBroadcast);
+			String[] responseString = this.getArguments(serverResponse.getPayloadString());
+			if (responseString[0].equals(FileTransferProtocol.DISCOVER)) {
+				this.serverAddress = serverResponse.getSourceAddress();
+				this.serverName = responseString[1];
+			} else {
+				this.showNamedError("Incorrect response to DISCOVER: failing");
+			}
+		
+			this.socket.setBroadcast(false);
+			success = true;
+		} catch (SocketException | UnknownHostException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (EmptyResponseException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ServerFailureException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return success;
+	}
 	// ------------------ Client Methods --------------------------
 
 	public void clientRunning() {
@@ -364,6 +423,11 @@ public class FileTransferClient {
 	}
 	
 	public String[] getArguments(String requestString) {
+		if (requestString == null) {
+			this.showNamedError("cannot get arguments from a NULL string");
+			return null;
+		}
+		
 		String[] split = requestString.split(FileTransferProtocol.DELIMITER);
 		return split;
 	}
@@ -400,7 +464,7 @@ public class FileTransferClient {
 	}
 	
 	public boolean requestListFiles() throws IOException, PacketException, UtilDatagramException {
-		boolean succes = false;
+		boolean success = false;
 
 		try {
 			File[] fileArray = null; 
@@ -415,7 +479,7 @@ public class FileTransferClient {
 
 			this.serverFiles = fileArray;
 			this.showNamedMessage("LIST OF FILES: \n" + Arrays.toString(fileArray)); // TODO make nice UI
-			succes = true;
+			success = true;
 
 		} catch (ClassNotFoundException e) {
 			// TODO Auto-generated catch block
@@ -426,7 +490,7 @@ public class FileTransferClient {
 			this.showNamedError("FAILURE> " + e.getLocalizedMessage());
 		}
 
-		return succes;
+		return success;
 	}
 	
 	/**
@@ -436,7 +500,7 @@ public class FileTransferClient {
 	 * @throws NotEnoughFreeSpaceException TODO throw or handle internally?
 	 */
 	public boolean downloadSingleFile(File fileToDownload) {
-		boolean succes = false;
+		boolean success = false;
 		this.showNamedMessage("WARNING: overwriting existing files!"); // TODO
 		try {
 			// create downloadHandler
@@ -482,10 +546,10 @@ public class FileTransferClient {
 				// TODO now everything is known: start download helper
 				new Thread(downloadHelper).start();
 				
-				succes = true;
+				success = true;
 			} else {
 				this.showNamedError("Invalid response to download request");
-				succes = false;
+				success = false;
 			}
 
 		} catch (SocketException e) {
@@ -503,13 +567,13 @@ public class FileTransferClient {
 		}
 		
 		// TODO actual downloading of file takes place in helper
-//		succes = true;
+//		success = true;
 				
-		return succes;
+		return success;
 	}
 	
 	public boolean uploadSingleFile(File fileToUpload) {
-		boolean succes = false;
+		boolean success = false;
 		
 		
 		this.showNamedMessage("WARNING: overwriting existing files on server!"); // TODO
@@ -547,10 +611,10 @@ public class FileTransferClient {
 				// TODO now everything is known: start download helper
 				new Thread(uploadHelper).start();
 				
-				succes = true;
+				success = true;
 			} else {
 				this.showNamedError("Invalid response to upload announcement");
-				succes = false;
+				success = false;
 			}
 
 		} catch (SocketException e) {
@@ -568,11 +632,11 @@ public class FileTransferClient {
 		// TODO actual uploading of file takes place in helper
 
 				
-		return succes;
+		return success;
 	}
 	
 	public boolean deleteSingleFile(File fileToUpload) {
-		boolean succes = false;
+		boolean success = false;
 		
 		this.showNamedMessage("WARNING: this deletes files on server!"); // TODO
 		try {
@@ -586,7 +650,7 @@ public class FileTransferClient {
 			if (responseSplit[0].contentEquals(FileTransferProtocol.DELETE)) {
 				this.showNamedMessage("File deleted!"); //TODO print more?
 				// TODO keep protocol in mind!
-				succes = true;
+				success = true;
 			}
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
@@ -597,11 +661,11 @@ public class FileTransferClient {
 			this.showNamedError("FAILURE> " + e.getLocalizedMessage());
 		}
 		
-		return succes;
+		return success;
 	}
 	
 	public boolean checkFile(File fileToCheck) {
-		boolean succes = false;
+		boolean success = false;
 
 		try {
 			boolean sameHash = this.compareLocalRemoteHash(fileToCheck);
@@ -612,7 +676,7 @@ public class FileTransferClient {
 				this.showNamedMessage("Local and remote files have the different hash: INTEGRITY FAILED");
 			}
 
-			succes = true;
+			success = true;
 
 		} catch (NoMatchingFileException e) {
 			this.showNamedError("Something went wrong while comparing the files: " + e.getLocalizedMessage());
@@ -622,7 +686,7 @@ public class FileTransferClient {
 			this.showNamedError("FAILURE> " + e.getLocalizedMessage());
 		}
 
-		return succes;
+		return success;
 	}
 
 	/**
@@ -694,7 +758,7 @@ public class FileTransferClient {
 	 * @return
 	 */
 	public boolean helperManager(List<Helper> listOfHelpers) { // TODO , Class<T> typeKey
-		boolean succes = false;
+		boolean success = false;
 
 		this.showNamedMessage("Found helpers: \n" + Arrays.toString(listOfHelpers.toArray())); // TODO make nice UI
 
@@ -715,9 +779,9 @@ public class FileTransferClient {
 			}
 		}
 		
-		succes = true; // TODO usefull here?
+		success = true; // TODO usefull here?
 
-		return succes;
+		return success;
 	}
 	
 	
@@ -896,7 +960,8 @@ public class FileTransferClient {
 			receivedPacket = TransportLayer.receivePacket(this.socket);
 
 			if (!(receivedPacket.getSourceAddress().equals(this.serverAddress)
-					&& receivedPacket.getSourcePort() == this.serverPort)) { 
+					&& receivedPacket.getSourcePort() == this.serverPort)
+					&& !this.socket.getBroadcast()) {  
 				this.showNamedError("SECURITY WARNING: this response is NOT"
 						+ " coming for known server > dropping it");
 				return null;

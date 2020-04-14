@@ -9,6 +9,11 @@ import exceptions.UtilByteException;
 import exceptions.UtilDatagramException;
 import protocol.FileTransferProtocol;
 
+/**
+ * TODO doc
+ * @author huub.lievestro
+ *
+ */
 public class TransportLayer {
 
 	public static DatagramSocket openNewDatagramSocket() throws SocketException {

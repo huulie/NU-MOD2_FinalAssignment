@@ -40,9 +40,6 @@ public class FileTransferServer implements Runnable {
 	/** The TUI of this FileTransferServer. */
 	private UI.TUI TUI; 
 
-	/** The name of this server. */
-	private static String SERVERNAME;
-
 	/** Network info for server. */
 	InetAddress ownAddress = null;
 	int ownPort = 0;
@@ -72,7 +69,7 @@ public class FileTransferServer implements Runnable {
 	/**
 	 * Name which will give acces to server file storage
 	 */
-	String ADMIN_NAME;
+	String adminName;
 	
 	// TODO: same as example, because interrupt thread? 	
 	boolean running;
@@ -92,7 +89,7 @@ public class FileTransferServer implements Runnable {
 		this.clientsWaitingList = new ArrayList<>();
 
 		this.TUI = new UI.TUI();
-		name = "FTServer"; // TODO fixed name, let user set it?
+		name = "FTServer"; // TODO fixed name, fallback if setup doesn't set it
 		
 		this.fileStorageDirName = "FTSstorage";
 		
@@ -167,8 +164,8 @@ public class FileTransferServer implements Runnable {
 		//        }
 
 		this.sandboxClients = true; // TODO input on pi returns nullpointer? this.TUI.getBoolean("Do you want to sandbox clients?");
-		this.ADMIN_NAME = "admin";
-		this.showNamedMessage("Admin is: " + this.ADMIN_NAME);
+		this.adminName = "admin";
+		this.showNamedMessage("Admin is: " + this.adminName);
 		this.sandboxStorages = new HashMap<String, Path>(); 
 
 		success = true; // TODO significant?
@@ -203,6 +200,8 @@ public class FileTransferServer implements Runnable {
 			this.ownAddress = NetworkLayer.getOwnAddress(); // TODO replace by discover?
 			this.showNamedMessage("Server listing on: " + this.ownAddress);
 			this.showNamedMessage("NOTE: depending on detection method, this may NOT be the actual interface used");
+			
+			this.name = this.ownAddress.getHostName();
 		} catch (UnknownHostException e) {
 			this.showNamedMessage("Could not determine own address: " + e.getLocalizedMessage());
 		} 
@@ -233,7 +232,9 @@ public class FileTransferServer implements Runnable {
 				System.out.println(Arrays.toString(receivedPacket.getPayload())); // TODO payloadBytes?
 				System.out.println(Arrays.toString(FileTransferProtocol.INIT_SESSION.getBytes()));
 
-				if (receivedPacket.getPayloadString().startsWith(FileTransferProtocol.INIT_SESSION)) {
+				if (receivedPacket.getPayloadString().startsWith(FileTransferProtocol.DISCOVER)) {
+					this.handleDiscover(receivedPacket);
+				} else if (receivedPacket.getPayloadString().startsWith(FileTransferProtocol.INIT_SESSION)) {
 					this.handleSessionRequest(receivedPacket);
 				} else {
 					this.showNamedError("Unknown packet: dropping");
@@ -262,8 +263,24 @@ public class FileTransferServer implements Runnable {
 	/**
 	 * TODO
 	 */
+	public void handleDiscover(Packet sessionInitPacket) {
+		InetAddress clientAddress = sessionInitPacket.getSourceAddress();
+		
+		this.showNamedMessage("DISCOVER packet received from " + clientAddress + " >> responding");
+		byte[] discoverResponse = (FileTransferProtocol.DISCOVER +
+				FileTransferProtocol.DELIMITER + this.name).getBytes();
+		this.sendBytesToClient(discoverResponse,
+				sessionInitPacket.getSourceAddress(),
+				sessionInitPacket.getSourcePort(),
+				discoverResponse.length - 1 + 1); // TODO make this more nice + note offset is string end +1 (note length starts at 1)
+		
+	}
+	
+	/**
+	 * TODO
+	 */
 	public void handleSessionRequest(Packet sessionInitPacket) {
-		InetAddress clientAddres = sessionInitPacket.getSourceAddress();
+		InetAddress clientAddress = sessionInitPacket.getSourceAddress();
 
 		String[] sessionRequest = sessionInitPacket.getPayloadString().split(FileTransferProtocol.DELIMITER);
 		String clientName;
@@ -277,9 +294,9 @@ public class FileTransferServer implements Runnable {
 		this.showNamedMessage("A new client [" + clientName 
 				+ "] (" + next_client_no 
 				+  ") is trying to connect from "
-				+ clientAddres + "...");
+				+ clientAddress + "...");
 
-		if (this.sandboxClients && !clientName.equals(this.ADMIN_NAME)) {
+		if (this.sandboxClients && !clientName.equals(this.adminName)) {
 			this.showNamedMessage("Assinging sandbox to this client...");
 			this.assignClientSandbox(clientName);
 		}
@@ -347,7 +364,7 @@ public class FileTransferServer implements Runnable {
 	 * @return the name of the sever.
 	 */
 	public String getServerName() {
-		return SERVERNAME;
+		return this.name;
 	}
 	
 	/**
@@ -357,7 +374,7 @@ public class FileTransferServer implements Runnable {
 	public Path getFileStorage(String clientName) {
 		Path clientFileStorage;
 
-		if (clientName.equals(this.ADMIN_NAME) || !this.sandboxClients) {
+		if (clientName.equals(this.adminName) || !this.sandboxClients) {
 			this.showNamedMessage("Client [" + clientName + "]=> Not sandboxing or admin detected: access to server storage granted");
 			clientFileStorage = this.fileStorage;
 		} else { 
