@@ -11,12 +11,19 @@ import network.Packet;
 import protocol.FileTransferProtocol;
 
 /**
- * TODO because datagramPacket is a final class and cannot be extended
+ * Utilities to work with Datagram(Packet)s.
+ * Note: the DatagramPacket class could not be extended, because it is a final class
  * @author huub.lievestro
  *
  */
 public class Datagram {
 
+	/**
+	 * Get id from header.
+	 * @param datagram containing the header with the id field
+	 * @return id 
+	 * @throws UtilDatagramException
+	 */
 	public static int getHeaderId(byte[] datagram) throws UtilDatagramException {
 		int id = -1;
 		
@@ -25,17 +32,21 @@ public class Datagram {
 					FileTransferProtocol.HEADER_ID_START,
 					FileTransferProtocol.HEADER_ID_LAST));
 		} catch (UtilByteException e) {
-			// TODO Auto-generated catch block
 			throw new UtilDatagramException(e.getLocalizedMessage());
 		}
 		
 		if (id > FileTransferProtocol.MAX_ID) {
 			throw new UtilDatagramException("ID cannot be larger than MAX_ID");
 		}
-		
 		return id;
 	}
 	
+	/**
+	 * Get headerLength from header.
+	 * @param datagram containing the header with the headerLength field
+	 * @return headerLength 
+	 * @throws UtilDatagramException
+	 */
 	public static int getHeaderHeaderLength(byte[] datagram) throws UtilDatagramException {
 		int headerLength = -1;
 		
@@ -44,13 +55,17 @@ public class Datagram {
 					FileTransferProtocol.HEADER_HEADER_LENGTH_START,
 					FileTransferProtocol.HEADER_HEADER_LENGTH_LAST));
 		} catch (UtilByteException e) {
-			// TODO Auto-generated catch block
 			throw new UtilDatagramException(e.getLocalizedMessage());
 		}
-		
 		return headerLength;
 	}
 	
+	/**
+	 * Get byteOffset from header.
+	 * @param datagram containing the header with the byteOffset field
+	 * @return byteOffset 
+	 * @throws UtilDatagramException
+	 */
 	public static int getHeaderByteOffset(byte[] datagram) throws UtilDatagramException {
 		int byteOffset = -1;
 		
@@ -59,14 +74,20 @@ public class Datagram {
 					FileTransferProtocol.HEADER_BYTE_OFFSET_START,
 					FileTransferProtocol.HEADER_BYTE_OFFSET_LAST));
 		} catch (UtilByteException e) {
-			// TODO Auto-generated catch block
 			throw new UtilDatagramException(e.getLocalizedMessage());
 		}
-		
 		return byteOffset;
 	}
 	
-	public static byte[] getPayload(byte[] datagram, int payloadLength) throws UtilDatagramException {
+	/**
+	 * Get payload from the datagramPacket.
+	 * @param datagram to extract payload from
+	 * @param payloadLength in bytes
+	 * @return byte array containing the payload
+	 * @throws UtilDatagramException
+	 */
+	public static byte[] getPayload(byte[] datagram, int payloadLength) 
+			throws UtilDatagramException {
 		byte[] payload = null; 
 
 		try {
@@ -74,37 +95,33 @@ public class Datagram {
 					FileTransferProtocol.PAYLOAD_START,
 					FileTransferProtocol.PAYLOAD_START + payloadLength - 1);
 		} catch (UtilByteException e) {
-			// TODO Auto-generated catch block
 			throw new UtilDatagramException(e.getLocalizedMessage());
 		}
-
 		return payload;
 	}
 	
 	/**
-	 * TODO
-	 * @param receivedDatagram NOTE: only use on received datagrams, at sendingDatagrams it will be destinationAddress 
-	 * @return
+	 * Get source address from received datagram.
+	 * NOTE: only use on received datagrams, at sendingDatagrams it will be destinationAddress 
+	 * @param receivedDatagram to extract source addres from
+	 * @return source address as InetAddress
 	 */
 	public static InetAddress getDatagramSourceAddress(DatagramPacket receivedDatagram) {
 		return receivedDatagram.getAddress();
 	}
 	
 	/**
-	 * TODO note only works for received datagrams! 
-	 * @param datagram
-	 * @param localSocket
-	 * @return
+	 * Create a Packet object from a received DatagramPacket
+	 * Note: only works for received datagrams! 
+	 * @param datagram received, to create Packet from
+	 * @param localSocket on which the datagram was received
+	 * @return Packet object, created from the datagram
 	 * @throws PacketException
 	 * @throws UtilDatagramException 
 	 */
-	public static Packet createPacketFromDatagram(DatagramPacket datagram, DatagramSocket receivingSocket) 
-			throws PacketException, UtilDatagramException {
-		
-		// TODO
-        // getLength()
-        // Returns the length of the data to be sent or the length of the data received.
-        
+	public static Packet createPacketFromDatagram(DatagramPacket datagram, 
+			DatagramSocket receivingSocket) throws PacketException, UtilDatagramException {
+
         byte[] data = datagram.getData();
 
         int id = util.Datagram.getHeaderId(data);
@@ -118,16 +135,23 @@ public class Datagram {
 				id, 
 				util.Datagram.getDatagramSourceAddress(datagram),
 				datagram.getPort(),
-				receivingSocket.getLocalAddress(), // TODO: assume own address? 
-				receivingSocket.getPort(), // TODO: retains binding to port number, or LOCALport?
-				payload,// TODO: remove any padding?! Based on payload length field
+				receivingSocket.getLocalAddress(),
+				receivingSocket.getPort(), 
+				payload, 
 				byteOffset
-				); // TODO: id, null should be own address / from datagram?
-		
+				); 
 		return packet;
 	}
 	
-	public static DatagramPacket buildDatagram(Packet packet, int destinationPort) throws UtilDatagramException {
+	/**
+	 * Create a DatagramPacket from a Packet.
+	 * @param packet to create the datagram
+	 * @param destinationPort to send the datagram to
+	 * @return datagramPacket, created from the Packet
+	 * @throws UtilDatagramException
+	 */
+	public static DatagramPacket buildDatagram(Packet packet, int destinationPort) 
+			throws UtilDatagramException {
 		
 		byte[] header = buildHeader(packet);
 		byte[] data = util.Bytes.concatArray(header, packet.getPayload());
@@ -137,14 +161,19 @@ public class Datagram {
 			datagram = new DatagramPacket(data, 
 					data.length, packet.getDestinationAddress(), destinationPort);
 		} else {
-			throw new UtilDatagramException("Cannot build datagram: packet larger than maximum size");
+			throw new UtilDatagramException("Cannot build datagram:"
+					+ " packet larger than maximum size");
 		}
-		
 		return datagram;
 	}
 	
+	/**
+	 * Build header for datagram, based on Packet.
+	 * @param packet to create header from
+	 * @return byte array containing the header
+	 * @throws UtilDatagramException
+	 */
 	public static byte[] buildHeader(Packet packet) throws UtilDatagramException {
-		// write file size into the header byte 
 		if (packet.getId() > FileTransferProtocol.MAX_ID) {
 			throw new UtilDatagramException("ID cannot be larger than MAX_ID");
 		}
@@ -152,16 +181,14 @@ public class Datagram {
 		byte[] header;
 		try {
 			byte[] idBytes = util.Bytes.int2ByteArray(packet.getId());
-			byte[] headerSizeBytes = util.Bytes.int2ByteArray(FileTransferProtocol.TOTAL_HEADER_SIZE);
-					//TODO util.Bytes.int2ByteArray(packet.getPayloadLength());
+			byte[] headerSizeBytes 
+				= util.Bytes.int2ByteArray(FileTransferProtocol.TOTAL_HEADER_SIZE);
 			byte[] byteOffsetBytes = util.Bytes.int2ByteArray(packet.getByteOffset());
 		
 			header = util.Bytes.concatArray(idBytes, headerSizeBytes, byteOffsetBytes);
 		} catch (UtilByteException e) {
-			// TODO Auto-generated catch block
 			throw new UtilDatagramException(e.getLocalizedMessage());
 		}
-
 		return header;
 	}
 	

@@ -8,35 +8,38 @@ import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * Helper class for setting timeouts. Supplied for convenience.
+ * Helper class for setting timeouts.
  * 
- * @author Jaco ter Braak & Frans van Dijk, University of Twente ADAPTED BY Huub Lievestro // TODO
- * @version 09-02-2016
+ * @author Huub Lievestro, adapted from Jaco ter Braak & Frans van Dijk (University of Twente) 
+ * @version 04-2020
  */
-public class TimeOut implements Runnable { // TODO static
-	private static Map<Date, Map<ITimeoutEventHandler, List<Object>>> eventHandlers = new HashMap<>();
+public class TimeOut implements Runnable {
+	private static Map<Date, Map<ITimeoutEventHandler, List<Object>>> eventHandlers
+		= new HashMap<>();
 	private static Thread eventTriggerThread;
 	private static boolean started = false;
 	private static ReentrantLock lock = new ReentrantLock();
 
 	/**
-	 * Starts the helper thread
+	 * Starts the helper thread.
 	 */
-	public static void Start() {
-		if (started)
+	public static void start() {
+		if (started) {
 			throw new IllegalStateException("Already started");
+		}
 		started = true;
 		eventTriggerThread = new Thread(new TimeOut());
 		eventTriggerThread.start();
 	}
 
 	/**
-	 * Stops the helper thread
+	 * Stops the helper thread.
 	 */
-	public static void Stop() {
-		if (!started)
+	public static void stop() {
+		if (!started) {
 			throw new IllegalStateException(
 					"Not started or already stopped");
+		}
 		eventTriggerThread.interrupt();
 		try {
 			eventTriggerThread.join();
@@ -45,7 +48,7 @@ public class TimeOut implements Runnable { // TODO static
 	}
 
 	/**
-	 * Set a timeout
+	 * Set a timeout.
 	 * 
 	 * @param millisecondsTimeout
 	 *            the timeout interval, starting now
@@ -72,7 +75,7 @@ public class TimeOut implements Runnable { // TODO static
 	}
 
 	/**
-	 * Do not call this
+	 * Do not call this.
 	 */
 	@Override
 	public void run() {
@@ -116,7 +119,7 @@ public class TimeOut implements Runnable { // TODO static
 				// deadlocks
 				for (ITimeoutEventHandler handler : handlersToInvoke
 						.keySet()) {
-					handlersToInvoke.get(handler).forEach(handler::TimeoutElapsed);
+					handlersToInvoke.get(handler).forEach(handler::timeoutElapsed);
 				}
 				handlersToInvoke.clear();
 

@@ -456,7 +456,7 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 		
 			    
 	@Override
-	public void TimeoutElapsed(Object tag) {
+	public void timeoutElapsed(Object tag) {
 		Packet packet = (Packet) tag;
 		if (!packet.isAck()) {
 			//Thread.interrupt();// TODO how to get thread to resend while waiting on this ACK?

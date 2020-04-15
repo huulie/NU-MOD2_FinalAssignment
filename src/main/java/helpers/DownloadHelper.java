@@ -397,7 +397,12 @@ public class DownloadHelper implements Helper, Runnable {
 		
 		this.showNamedMessage("Writing file contents to file...");
 		long timestamp = System.currentTimeMillis();
-		util.FileOperations.setFileContents(this.fileContents, this.fileToWrite, timestamp);
+		try {
+			util.FileOperations.setFileContents(this.fileContents, this.fileToWrite);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		this.showNamedMessage("... file written to " + this.fileToWrite.getAbsolutePath());
 	}
 	

@@ -11,8 +11,18 @@ import java.util.Arrays;
 
 import exceptions.UtilByteException;
 
+/**
+ * Utilities to work with bytes.
+ * @author huub.lievestro
+ *
+ */
 public class Bytes {
 
+	/**
+	 * Concatenate multiple byte arrays.
+	 * @param arrays to be concatenated
+	 * @return concatenated byte array, containing all input arrays
+	 */
 	public static byte[] concatArray(byte[]...arrays) {
 	    // Determine the length of the result array
 	    int totalLength = 0;
@@ -29,46 +39,44 @@ public class Bytes {
 	        System.arraycopy(arrays[i], 0, result, currentIndex, arrays[i].length);
 	        currentIndex += arrays[i].length;
 	    }
-
 	    return result;
 	}
 	
 	/**
-	 * TODO
-	 * @param i
-	 * @return
-	 * @throws UtilByteException
+	 * Convert an int to a byte array.
+	 * @param i integer to convert
+	 * @return byte array, representing this integer
+	 * @throws UtilByteException if a negative integer is put in
 	 */
 	public static byte[] int2ByteArray(int i) throws UtilByteException {
 		if (i < 0) {
 			throw new UtilByteException("This conversion does NOT support negative integers");
 		}
-		
-//		int numberOfBytesNeeded;
-//		if (i == 0) {
-//			numberOfBytesNeeded = 1;
-//		} else {
-//			numberOfBytesNeeded = (int) Math.ceil(Math.log(i) / Math.log(2) / 8);
-//		}
-		
-		ByteBuffer b = ByteBuffer.allocate(4); // TODO: always puts in block of 4 bytes
-			// TODO: check with number of bytes!
+		ByteBuffer b = ByteBuffer.allocate(4); 
 		b.putInt(i); // using Big Endian! 
 		return b.array();
 	}
 	
-	/*
-	 * TODO
+	/**
+	 * Convert a byte array to an int.
+	 * Note: assumes byte array big-endian!
+	 * @param byteArray to convert
+	 * @return int, represented by this byteArray
 	 */
 	public static int byteArray2int(byte[] byteArray)  {
 		return ByteBuffer.wrap(byteArray).getInt(); // assuming Big-endian!
 	}
 	
 	/**
-	 * TODO
-	 * adapted from https://stackoverflow.com/a/9855338 TODO metion?
+	 * Array used to hold characters for bytes to hex conversion.
 	 */
 	private static final char[] HEX_ARRAY = "0123456789ABCDEF".toCharArray();
+	
+	/**
+	 * Convert bytes to their hexadecimal representation.
+	 * @param bytes to convert
+	 * @return String with hexadecimal representation of the bytes
+	 */
 	public static String bytesToHex(byte[] bytes) {
 	    char[] hexChars = new char[bytes.length * 2];
 	    for (int j = 0; j < bytes.length; j++) {
@@ -80,18 +88,27 @@ public class Bytes {
 	}
 	
 	/**
-	 * TODO
-	 * last is inclusive (note: copyOfRange: exclusive)
-	 * @throws UtilByteException 
+	 * Take a part of a byte array.
+	 * Note: last is inclusive, so this index will be copied (different from copyOfRange: exclusive)
+	 * @param array to take this part from
+	 * @param start first index to include
+	 * @param last final index to include
+	 * @return subarray, containing the elements from the array with indices start trough last
+	 * @throws UtilByteException
 	 */
 	public static byte[] subArray(byte[] array, int start, int last) throws UtilByteException {
 		if (start < 0 || last < 0 || last + 1 > array.length) {
 			throw new UtilByteException("Indices cannot be negative!");
 		}
-		
 		return Arrays.copyOfRange(array, start, last + 1);
 	}
 	
+	/**
+	 * Serialise an object to a byte array.
+	 * @param object to serialize
+	 * @return byte array, representing the object
+	 * @throws IOException
+	 */
 	public static byte[] serialiseObjectToByteArray(Object object) throws IOException {
 		ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
 		ObjectOutputStream objectOutputStream =
@@ -103,27 +120,39 @@ public class Bytes {
 		return byteArrayOutputStream.toByteArray();
 	}
 	
-	public static File[] deserialiseByteArrayToFileArray(byte[] byteArray) throws ClassNotFoundException, IOException {
-		// TODO https://stackoverflow.com/questions/14669820/how-to-convert-a-string-array-to-a-byte-array-java
+	/**
+	 * Deserialise a byte array to its corresponding File array object.
+	 * @param byteArray containing the file array object
+	 * @return file array
+	 * @throws ClassNotFoundException
+	 * @throws IOException
+	 */
+	public static File[] deserialiseByteArrayToFileArray(byte[] byteArray) 
+			throws ClassNotFoundException, IOException {
 		ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(byteArray);
 		ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream);
 
-		File[] fileArray = (File[]) objectInputStream.readObject(); // instead of String
+		File[] fileArray = (File[]) objectInputStream.readObject(); 
 
 		objectInputStream.close();
-
 		return fileArray;
 	}
 	
-	public static File deserialiseByteArrayToFile(byte[] byteArray) throws ClassNotFoundException, IOException {
-		// TODO https://stackoverflow.com/questions/14669820/how-to-convert-a-string-array-to-a-byte-array-java
+	/**
+	 * Deserialise a byte array to its corresponding File object.
+	 * @param byteArray containing the file  object
+	 * @return file 
+	 * @throws ClassNotFoundException
+	 * @throws IOException
+	 */
+	public static File deserialiseByteArrayToFile(byte[] byteArray) 
+			throws ClassNotFoundException, IOException {
 		ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(byteArray);
 		ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream);
 
-		File fileArray = (File) objectInputStream.readObject(); // instead of String
+		File fileArray = (File) objectInputStream.readObject();
 
 		objectInputStream.close();
-
 		return fileArray;
 	}
 }

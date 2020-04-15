@@ -208,7 +208,7 @@ public class FileTransferServer implements Runnable {
 	}
 	
 	public void setupTimeoutThread() {
-		util.TimeOut.Start();
+		util.TimeOut.start();
 		this.showNamedMessage("TimeOut helper started...");
 	}
 	
@@ -352,7 +352,7 @@ public class FileTransferServer implements Runnable {
 		// see example on github? 
 		this.socket.close(); // TODO make a method for this, ensure!
 		
-		util.TimeOut.Stop();
+		util.TimeOut.stop();
 		this.showNamedMessage("TimeOut helper stopped.");
 
 	}
