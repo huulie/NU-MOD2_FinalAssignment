@@ -34,94 +34,112 @@ import protocol.FileTransferProtocol;
 import server.FileTransferClientHandler;
 import userInterface.TUICommands;
 
+/**
+ * Client to interact with FileTransfer server.
+ * @author huub.lievestro
+ *
+ */
 public class FileTransferClient {
 
 	/**
-	 * TODO .
+	 * DatagramSocket to receive and send packets.
 	 */
 	DatagramSocket socket;
 	
 	/**
-	 * TODO
+	 * Network address of this client.
 	 */
 	InetAddress ownAddress;
 	
 	/**
-	 * TODO
+	 * Network port this client, bound to the socket.
 	 */
 	int ownPort;
 	
 	/**
-	 * TODO
-	 */
-	InetAddress serverAddress;
-	
-	/**
-	 * TODO 
+	 * Indicates if a session is started with a server.
 	 */
 	boolean sessionActive;
 	
 	/**
-	 * TODO
+	 * Network address of the active server.
+	 */
+	InetAddress serverAddress;
+	
+	/**
+	 * Network port of the active server.
 	 */
 	int serverPort;
 	
 	/**
-	 * 
+	 * Name of the active server.
 	 */
 	private String serverName;
 	
-	/** The TUI of this FileTransferServer. */
-	private userInterface.TUI TUI; 
+	/**
+	 * TUI of this FileTransferServer. 
+	 */
+	private userInterface.TUI textUI;
 	
 	/**
-	 * TODO
+	 * Local filesystem root.
 	 */
 	Path root;
+	
+	/**
+	 * Local filesystem storage location of this client.
+	 */
 	Path fileStorage;
+	
+	/**
+	 * Name of the local storage location of this client.
+	 */
 	String fileStorageDirName;
 	
 	/*
-	 * TODO
+	 * Last retrieved list of files on server
 	 */
 	File[] serverFiles;
 	
-	
 	/**
 	 *  List of downloads, one for each connected downloadHelper. 
-	 *  */
-	private List<Helper> downloads; // TODO DownloadHelpers
+	 */
+	private List<Helper> downloads; 
 	
 	/**
 	 *  List of uploads, one for each connected uploadHelper. 
-	 *  */
-	private List<Helper> uploads; // TODO UploadHelper
+	 */
+	private List<Helper> uploads;
 	
+	/**
+	 * Indicates if client is running.
+	 */
 	boolean running;
 	
+	/**
+	 * Name of this client.
+	 */
 	String name;
 
 	
 	/**
 	 * Construct a new FileTransfer client.
-	 * @param socket
-	 * @param port
+	 * @param port to use for this client
 	 */
 	public FileTransferClient(int port) {
-		this.TUI = new userInterface.TUI();
+		this.textUI = new userInterface.TUI();
 		
 		this.fileStorageDirName = "FTCstorage";
 
 		this.ownPort = port;
 		
-		this.sessionActive = false; // TODO may become int to support multiple sessions for one client? 
+		this.sessionActive = false;
 		
 		this.downloads = new ArrayList<>();
 		this.uploads = new ArrayList<>();
 		
-//		name = "FTClient"; // TODO fixed name, let user set it?
 		while (this.name == null || this.name.isBlank()) {
-			this.name = TUI.getString("What is the name of this client?");
+			this.name = textUI.getString("What is the name of this client?");
 		}
 
 		// Do setup
@@ -131,7 +149,7 @@ public class FileTransferClient {
 				setupSuccess = this.setup();
 			} catch (exceptions.ExitProgram eExit) {
 				// If setup() throws an ExitProgram exception, stop the program.
-				if (!TUI.getBoolean("Do you want to retry setup?")) {
+				if (!textUI.getBoolean("Do you want to retry setup?")) {
 					setupSuccess = false;
 				}
 			}
@@ -143,18 +161,14 @@ public class FileTransferClient {
 
 	// ------------------ Client Setup --------------------------
 	/**
-	 * Sets up a new FileTransferClient TODO
+	 * Sets up a new FileTransferClient.
 	 * 
-	 * @throws ExitProgram if a connection can not be created on the given 
-	 *                     port and the user decides to exit the program.
-	 * @ensures a serverSocket is opened.
+	 * @return boolean indicating if succeeded
+	 * @throws ExitProgram if the user decides to exit the program.
 	 */
 	public boolean setup() throws exceptions.ExitProgram {
 		this.showNamedMessage("Setting up the client...");
 		boolean success = false;
-
-		// First, initialise the Server.
-		// SERVERNAME = TUI.getString("What is the name of this server?"); // TODO name? 
 
 		boolean successFileSystem = this.setupFileSystem();
 		boolean succesSocket = this.setupSocket();
@@ -171,40 +185,43 @@ public class FileTransferClient {
 		return success;
 	}
 	
+	/**
+	 * Sets up the file system.
+	 * @return boolean indicating if succeeded
+	 */
 	public boolean setupFileSystem() {
 		boolean success = false;
-		this.root = Paths.get("").toAbsolutePath(); // TODO suitable method? https://www.baeldung.com/java-current-directory
+		this.root = Paths.get("").toAbsolutePath();
 		this.showNamedMessage("Client root path set to: " + this.root.toString());
 		
 		this.fileStorage = root.resolve(fileStorageDirName);
 		this.showNamedMessage("File storage set to: " + this.fileStorage.toString());
 
-		
-//		if (!Files.exists(fileStorage)) { // TODO: use if or catch exception
-            try {
-				Files.createDirectory(fileStorage);
-		    	this.showNamedMessage("File storage directory did not exist: created " + fileStorageDirName + " in client root"); 
-            } catch(java.nio.file.FileAlreadyExistsException eExist) {
-            	this.showNamedMessage("File storage directory already exist: not doing anything with " + fileStorageDirName + " in client root");
-            } catch (IOException e) {
-				// TODO Auto-generated catch block
-				this.showNamedError("Failed to create file storage: server CRASHED because " + e.getLocalizedMessage());
-				e.printStackTrace();
-			}
-//        } else {
-//	    	this.showNamedMessage("File storage directory already exist: not doing anything with " + fileStorageDirName + " in client root"); 
-//        }
-            success = true;
-    		return success;
+		try {
+			Files.createDirectory(fileStorage);
+			this.showNamedMessage("File storage directory did not exist:"
+					+ " created " + fileStorageDirName + " in client root"); 
+		} catch (java.nio.file.FileAlreadyExistsException eExist) {
+			this.showNamedMessage("File storage directory already exist:"
+					+ " not doing anything with " + fileStorageDirName + " in client root");
+		} catch (IOException e) {
+			this.showNamedError("Failed to create file storage:"
+					+ e.getLocalizedMessage());
+		}
+
+		success = true;
+		return success;
 	}
 	
+	/**
+	 * Sets up the socket.
+	 * @return boolean indicating if succeeded
+	 */
 	public boolean setupSocket() throws ExitProgram {
 		boolean success = false;
 		
 		this.showNamedMessage("Trying to open a new socket...");
-		while (this.socket == null) { // TODO: ask for server port?
-			//port = TUI.getInt("Please enter the server port.");
-
+		while (this.socket == null) { 
 			try {
 				this.socket = TransportLayer.openNewDatagramSocket(this.ownPort);
 				this.showNamedMessage("Client now bound to port " + ownPort);
@@ -212,7 +229,7 @@ public class FileTransferClient {
 			} catch (SocketException e) {
 				this.showNamedError("Something went wrong when opening the socket: "
 						+ e.getLocalizedMessage());
-				if (!TUI.getBoolean("Do you want to try again?")) {
+				if (!textUI.getBoolean("Do you want to try again?")) {
 					throw new exceptions.ExitProgram("User indicated to exit the "
 							+ "program after socket opening failure.");
 				}
@@ -221,23 +238,34 @@ public class FileTransferClient {
 		return success;
 	}
 	
+	/**
+	 * Sets up the client network information.
+	 * @return boolean indicating if succeeded
+	 */
 	public void setupOwnAddress() {
 		try {
 			this.ownAddress = NetworkLayer.getOwnAddress(); // TODO replace by discover?
 			this.showNamedMessage("Client listing on: " + this.ownAddress);
-			this.showNamedMessage("NOTE: depending on detection method, this may NOT be the actual interface used");
+			this.showNamedMessage("NOTE: depending on detection method,"
+					+ " this may NOT be the actual interface used");
+			this.showNamedMessage("Discovered preferred local address: " 
+					+ NetworkLayer.discoverLocalAddress());
 		} catch (UnknownHostException e) {
 			this.showNamedMessage("Could not determine own address: " + e.getLocalizedMessage());
 		} 
 	}
 	
-	public boolean setServer() { //(InetAddress serverAdress, int serverPort) {
+	/**
+	 * Sets up the server network information.
+	 * @return boolean indicating if succeeded
+	 */
+	public boolean setServer() {
 		boolean success = false;
 		
 		this.serverPort = FileTransferProtocol.DEFAULT_SERVER_PORT;
 		
-		boolean searchByHostName = TUI.getBoolean("Do you want to search by hostname? "
-				+ "(if not, client will try multicast search)" );
+		boolean searchByHostName = textUI.getBoolean("Do you want to search by hostname? "
+				+ "(if not, client will try multicast search)");
 		
 		if (searchByHostName) {
 			success = this.findServerByHostName();
@@ -246,48 +274,62 @@ public class FileTransferClient {
 		}
 		
 		if (success) {
-		this.showNamedMessage("Server set to " + this.serverName + ", with address " +
-				this.serverAddress + " and port " + this.serverPort);
+			this.showNamedMessage("Server set to " + this.serverName + ", with address " +
+					this.serverAddress + " and port " + this.serverPort);
 		}
 		
 		return success;
 	}
 	
-	public boolean setupStartSession() { // TODO or require at startup
+	/**
+	 * Sets up a session with server.
+	 * Note: may be done later with START_SESSION
+	 * @return boolean indicating if succeeded
+	 */
+	public boolean setupStartSession() { 
 		this.showNamedMessage("Initiating session with server...");
 		try {
-			while (!this.requestSession()) { // TODO clear?
-				TUI.getBoolean("Try again?");
+			while (!this.requestSession()) {
+				textUI.getBoolean("Try again?");
 			}
 		} catch (IOException | PacketException | UtilDatagramException e) {
-			// TODO Auto-generated catch block
-			TUI.showError("Something went wrong wile starting the session: " + e.getLocalizedMessage());
+			textUI.showError("Something went wrong while starting the session: " 
+					+ e.getLocalizedMessage());
 		}
 		
 		return this.sessionActive;
 	}
 	
+	/**
+	 * Find a server network address using its host name,
+	 * and set server to found server.
+	 * @return boolean indicating if succeeded
+	 */
 	public boolean findServerByHostName() {
 		boolean success = false;
-//		String serverName = "nvc4122.nedap.local";
-//		String serverName = "nu-pi-huub";
-		this.serverName = TUI.getString("What is the hostname of the server?");
+		this.serverName = textUI.getString("What is the hostname of the server?");
 		
 		try {
 			this.serverAddress = NetworkLayer.getAdressByName(this.serverName); 
 			success = true;
 		} catch (UnknownHostException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			textUI.showError("Something went wrong while searching for host " + this.serverName 
+					+ ": " +  e.getLocalizedMessage());
 		} 
+		
 		return success;
 	}
 	
+	/**
+	 * Find a server network address using broadcast of a DISCOVER packet,
+	 * and set server to found server.
+	 * @return boolean indicating if succeeded
+	 */
 	public boolean discoverServer() {
 		boolean success = false;
 		
 		this.showNamedMessage("Note: if >1 server responds to DISCOVER, "
-				+ "only the first (and probably fastest) one will be learned");  // TODO formulation
+				+ "only the first (and probably fastest) one will be learned");
 		
 		try {
 			this.socket.setBroadcast(true);
@@ -295,7 +337,7 @@ public class FileTransferClient {
 					+ FileTransferProtocol.DELIMITER + this.name;
 			
 			InetAddress broadcast = NetworkLayer.getAdressByName("255.255.255.255");
-			this.serverAddress = broadcast; // TODO or NetworkInterface .getBroadcast()
+			this.serverAddress = broadcast;
 		
 			Packet serverResponse = this.requestServer(discoverBroadcast);
 			String[] responseString = this.getArguments(serverResponse.getPayloadString());
@@ -304,44 +346,54 @@ public class FileTransferClient {
 				this.serverName = responseString[1];
 			} else {
 				this.showNamedError("Incorrect response to DISCOVER: failing");
+				this.socket.setBroadcast(false);
 			}
 		
 			this.socket.setBroadcast(false);
 			success = true;
 		} catch (SocketException | UnknownHostException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			textUI.showError("Something went wrong while searching for a server" 
+					+ ": " +  e.getLocalizedMessage());
 		} catch (EmptyResponseException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			textUI.showError("Something went wrong while searching for a server" 
+					+ "> empty response: " +  e.getLocalizedMessage());
 		} catch (ServerFailureException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			textUI.showError("Something went wrong while searching for a server" 
+					+ "> server failed: " +  e.getLocalizedMessage());
 		}
 		
 		return success;
 	}
+	
 	// ------------------ Client Methods --------------------------
 
+	/**
+	 * Takes and processes user input while the client is running.
+	 */
 	public void clientRunning() {
 		while (this.running) {
-			String userInputString = TUI.getString("Please input:");
+			String userInputString = textUI.getString("Please input:");
 			this.processUserInput(userInputString);
 		}
 	}
 	
+	/**
+	 * Take input from the user and call corresponding method,
+	 *  with some relevant feedback to the user.
+	 *  Note: most called methods return true on success = used to check.
+	 * @param input from the user as a String
+	 */
 	public void processUserInput(String input) {
 		String[] request = this.getArguments(input); 
-		String command = request[0]; //.charAt(0); // TODO or String?
-		// TODO check string being null, to prevent nullpointer exception?!
+		String command = request[0]; 
 
 		try {
 			switch (command) {
 				case TUICommands.START_SESSION:
 					if (!this.sessionActive) {
 						this.showNamedMessage("Initiating session with server...");
-						while (!this.requestSession()) { // TODO clear?
-							TUI.getBoolean("Try again?");
+						while (!this.requestSession()) {
+							textUI.getBoolean("Try again?");
 						}
 					} else {
 						this.showNamedMessage("Session is already active");
@@ -350,93 +402,93 @@ public class FileTransferClient {
 
 				case TUICommands.LIST_FILES: 
 					this.showNamedMessage("Requesting list of files...");
-					if (!this.requestListFiles()) { // TODO clear?
+					if (!this.requestListFiles()) { 
 						this.showNamedError("Retrieving list of files failed");
 					}
 					break;
 					
 				case TUICommands.LIST_FILES_LOCAL: 
 					this.showNamedMessage("Making list of local files...");
-//					if (!this.requestListFilesLOCAL()) { // TODO clear?
-//						this.showNamedError("Retrieving list of files failed");
-//					}
-					this.showNamedMessage(Arrays.toString(this.getLocalFiles()));
+					this.showNamedMessage(Arrays.toString(this.getLocalFiles()));  
 					break;
 
 				case TUICommands.DOWNLOAD_SINGLE:
 					File fileToDownload = this.selectServerFile();
-
-						if (!this.downloadSingleFile(fileToDownload)) { // TODO clear?
-							this.showNamedError("Downloading file failed");
-						}
+					if (!this.downloadSingleFile(fileToDownload)) {
+						this.showNamedError("Downloading file failed");
+					}
 					break;
 					
 				case TUICommands.UPLOAD_SINGLE:
 					File fileToUpload = this.selectLocalFile();
-
-					if (!this.uploadSingleFile(fileToUpload)) { // TODO clear?
+					if (!this.uploadSingleFile(fileToUpload)) { 
 						this.showNamedError("Uploading file failed");
 					}
 					break;
 					
 				case TUICommands.DELETE_SINGLE:
 					File fileToDelete = this.selectServerFile();
-
-					if (!this.deleteSingleFile(fileToDelete)) { // TODO clear?
+					if (!this.deleteSingleFile(fileToDelete)) { 
 						this.showNamedError("Deleting file failed");
 					}
 					break;
 
-				case TUICommands.HELP:
-					// do something
-					this.TUI.printHelpMenu();
-					break;
-				
-				case TUICommands.EXIT:
-					// do something
-					this.shutdown();
-					break;
-					
 				case TUICommands.CHECK_INTEGRITY:
 					File fileToCheck = this.selectLocalFile();
-
-					if (!this.checkFile(fileToCheck)) { // TODO clear?
+					if (!this.checkFile(fileToCheck)) { 
 						this.showNamedError("Checking file failed");
 					}
 					break;
 					
 				case TUICommands.UPLOAD_MANAGER:
-					if (!this.helperManager(this.uploads)) { // TODO clear?
+					if (!this.helperManager(this.uploads)) { 
 						this.showNamedError("Upload manager failed!");
 					}
 					break;
 
 				case TUICommands.DOWNLOAD_MANAGER:
-					if (!this.helperManager(this.downloads)) { // TODO clear?
-						this.showNamedError("Upload manager failed!");
+					if (!this.helperManager(this.downloads)) {
+						this.showNamedError("Download manager failed!");
 					}
+					break;
+					
+				case TUICommands.HELP:
+					this.textUI.printHelpMenu();
+					break;
+				
+				case TUICommands.EXIT:
+					this.shutdown();
 					break;
 				
 				default:
-					this.showNamedError("Unknow command received"); // what TODO with it?
+					this.showNamedError("Unknow command received (and ignoring it)"); 
 			}
 		} catch (IOException | PacketException | UtilDatagramException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			this.showNamedError("Something went wrong: " + e.getLocalizedMessage());
 		}
 		this.showNamedMessage("... done!");
 	}
 	
+	/**
+	 * Split the requestString in command and optional arguments.
+	 * @param requestString
+	 * @return String[] with command and optional arguments
+	 */
 	public String[] getArguments(String requestString) {
 		if (requestString == null) {
 			this.showNamedError("cannot get arguments from a NULL string");
 			return null;
 		}
-		
-		String[] split = requestString.split(FileTransferProtocol.DELIMITER);
-		return split;
+		return requestString.split(FileTransferProtocol.DELIMITER);
 	}
 	
+	/**
+	 * Request a session (= client handler) to the server.
+	 * @return boolean indicating if succeeded
+	 * @throws IOException
+	 * @throws PacketException
+	 * @throws UtilDatagramException
+	 */
 	public boolean requestSession() throws IOException, PacketException, UtilDatagramException {
 		try {
 			String sessionRequest = FileTransferProtocol.INIT_SESSION 
@@ -446,11 +498,8 @@ public class FileTransferClient {
 			Packet responsePacket = this.requestServer(sessionRequest);
 			String[] responseSplit = this.getArguments(responsePacket.getPayloadString());
 
-			//		if (Arrays.equals(responseBytes, FileTransferProtocol.INIT_SESSION)) {
 			if (responseSplit[0].equals(FileTransferProtocol.INIT_SESSION)) {
-				// TODO note: different from .equals() for strings!
 				this.sessionActive = true;
-				//			this.serverPort = receivedPacket.getSourcePort(); // update to clientHandler
 				this.serverPort =  Integer.parseInt(responseSplit[1]); // update to clientHandler
 				this.showNamedMessage("Session started with server port = " + this.serverPort);
 				return true;
@@ -468,6 +517,13 @@ public class FileTransferClient {
 		return this.sessionActive;
 	}
 	
+	/**
+	 * Request list of files on the server, and update serverFiles.
+	 * @return boolean indicating if succeeded
+	 * @throws IOException
+	 * @throws PacketException
+	 * @throws UtilDatagramException
+	 */
 	public boolean requestListFiles() throws IOException, PacketException, UtilDatagramException {
 		boolean success = false;
 
@@ -477,18 +533,16 @@ public class FileTransferClient {
 			Packet responsePacket = this.requestServer(FileTransferProtocol.LIST_FILES);
 
 			byte[] responseBytes = responsePacket.getPayloadBytes();
-			this.showNamedMessage("Server response received, now processing..."); // TODO or also in requestServer?
-
-
+			
+			this.showNamedMessage("Server response received, now processing..."); 
 			fileArray = util.Bytes.deserialiseByteArrayToFileArray(responseBytes);
-
 			this.serverFiles = fileArray;
-			this.showNamedMessage("LIST OF FILES: \n" + Arrays.toString(fileArray)); // TODO make nice UI
+			this.showNamedMessage("LIST OF FILES: \n" + Arrays.toString(fileArray));
+			
 			success = true;
 
 		} catch (ClassNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			this.showNamedError("Problems with received data: " + e.getLocalizedMessage());
 		} catch (EmptyResponseException e) {
 			this.showNamedError("Response from server was empty: " + e.getLocalizedMessage());
 		} catch (ServerFailureException e) {
@@ -499,27 +553,26 @@ public class FileTransferClient {
 	}
 	
 	/**
-	 * TODO
-	 * @param fileToDownload TODO: NOTE this is file as on server, not as to write on client!
-	 * @return
-	 * @throws NotEnoughFreeSpaceException TODO throw or handle internally?
+	 * Request download of a single file from the server,
+	 * and start a downloadHelper to receive it.
+	 * @param File fileToDownload (NOTE: file as on server, not as to write on client!)
+	 * @return boolean indicating if succeeded
 	 */
 	public boolean downloadSingleFile(File fileToDownload) {
 		boolean success = false;
-		this.showNamedMessage("WARNING: overwriting existing files!"); // TODO
+		this.showNamedMessage("WARNING: overwriting existing files!"); 
 		try {
 			// create downloadHandler
 			File fileToWrite = new File(this.fileStorage.toString() +
 					File.separator + fileToDownload.getName());
-//			int fileSizeToDownload = (int) fileToDownload.length(); // TODO will return zero at this local filesystem! TODO casting long to int!
 			DatagramSocket downloadSocket = TransportLayer.openNewDatagramSocket();
 			
 			DownloadHelper downloadHelper = new DownloadHelper(this,
-					downloadSocket, this.serverAddress, -2, -1, fileToWrite, -1); // TODO unset port uploader and fileSize
-			// TODO uploaderPort still to set
+					downloadSocket, this.serverAddress, -2, -1, fileToWrite, -1); 
+			// note: uploaderPort, fileSize and startID still to set
 			this.downloads.add(downloadHelper);
 
-			// TODO request file, provide downloaderHelper port
+			// request file, provide downloaderHelper port
 			String singleFileRequest = FileTransferProtocol.DOWNLOAD + 
 					FileTransferProtocol.DELIMITER + 
 					downloadSocket.getLocalPort();
@@ -531,60 +584,60 @@ public class FileTransferClient {
 			
 			if (responseSplit[0].contentEquals(FileTransferProtocol.UPLOAD)) {
 				downloadHelper.setUploaderPort(Integer.parseInt(responseSplit[1])); 
-				// TODO keep protocol in mind!
-				this.showNamedMessage("Uploader is on server port = " + Integer.parseInt(responseSplit[1])); //TODO efficiency
-				
-				int totalFileSize = Integer.parseInt(responseSplit[2]); 					// TODO keep protocol in mind!
-				this.showNamedMessage("Uploader reports total file size = " + totalFileSize + " bytes");
-				
-				long freeSpace = this.fileStorage.toFile().getUsableSpace(); // TODO comparing long to int! (ccasting introduces negative)
-				if (freeSpace > totalFileSize) {
-					downloadHelper.setTotalFileSize(totalFileSize); 
-					this.showNamedMessage("Free space remaining after download: " + (freeSpace-totalFileSize) + " bytes");
-				} else {
-					this.downloads.remove(downloadHelper); // TODO need to destroy or can GbCollect?
-					throw new NotEnoughFreeSpaceException(totalFileSize + "bytes don't fit in " + freeSpace + "bytes of free space");
+				this.showNamedMessage("Uploader is on server port = " 
+						+ Integer.parseInt(responseSplit[1])); 
 
+				int totalFileSize = Integer.parseInt(responseSplit[2]);
+				this.showNamedMessage("Uploader reports total file size = " 
+						+ totalFileSize + " bytes");
+				
+				long freeSpace = this.fileStorage.toFile().getUsableSpace(); 
+				if (freeSpace > totalFileSize) { // TODO comparing long to int! 
+					downloadHelper.setTotalFileSize(totalFileSize); 
+					this.showNamedMessage("Free space remaining after download: " 
+							+ (freeSpace - totalFileSize) + " bytes");
+				} else {
+					this.downloads.remove(downloadHelper); 
+					throw new NotEnoughFreeSpaceException(totalFileSize 
+							+ "bytes don't fit in " + freeSpace + "bytes of free space");
 				}
 				
-				int startID = Integer.parseInt(responseSplit[3]); 					// TODO keep protocol in mind!
+				int startID = Integer.parseInt(responseSplit[3]);
 				this.showNamedMessage("Uploader starts at ID = " + startID);
 				downloadHelper.setStartID(startID);
 				
-				// TODO now everything is known: start download helper
+				// now everything is known: start download helper
 				new Thread(downloadHelper).start();
-				
 				success = true;
 			} else {
 				this.showNamedError("Invalid response to download request");
 				success = false;
 			}
 
-		} catch (SocketException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			this.showNamedError("Something went wrong: " + e.getLocalizedMessage());
 		} catch (EmptyResponseException e) {
 			this.showNamedError("Response from server was empty: " + e.getLocalizedMessage());
 		} catch (ServerFailureException e) {
-			this.showNamedError("FAILURE> " + e.getLocalizedMessage());
+			this.showNamedError("SERVER FAILURE> " + e.getLocalizedMessage());
 		} catch (NotEnoughFreeSpaceException e) {
-			this.showNamedError("Not enough free space to store download:" + e.getLocalizedMessage()); // TODO handle here?!
+			this.showNamedError("Not enough free space to store download:"
+					+ e.getLocalizedMessage()); 
 		}
-		
-		// TODO actual downloading of file takes place in helper
-//		success = true;
-				
+
 		return success;
 	}
 	
+	/**
+	 Request upload of a single file to the server,
+	 * and start a uploadHelper to send it.
+	 * @param File fileToUpload (NOTE: file as on client!)
+	 * @return boolean indicating if succeeded
+	 */
 	public boolean uploadSingleFile(File fileToUpload) {
 		boolean success = false;
 		
-		
-		this.showNamedMessage("WARNING: overwriting existing files on server!"); // TODO
+		this.showNamedMessage("WARNING: overwriting existing files on server!"); 
 		try {
 			// create uploadHandler
 			DatagramSocket uploadSocket = TransportLayer.openNewDatagramSocket();
@@ -593,19 +646,18 @@ public class FileTransferClient {
 
 			UploadHelper uploadHelper = new UploadHelper(this, uploadSocket,
 					this.serverAddress, -2, fileSizeToUpload, fileToUpload); 
-			// TODO downloader port unset
+			// Note: downloaderPort still unset
 
 			this.uploads.add(uploadHelper);
 
-			// TODO request file, provide uploaderHelper port
+			// request file, provide uploaderHelper port
 			String singleFileAnnouncement = FileTransferProtocol.UPLOAD + 
 					FileTransferProtocol.DELIMITER + 
 					uploadSocket.getLocalPort() + 
 					FileTransferProtocol.DELIMITER + 
 					fileSizeToUpload +
 					FileTransferProtocol.DELIMITER + 
-					uploadHelper.getStartId(); // + // TODO ask to helper/
-					//FileTransferProtocol.DELIMITER.getBytes());
+					uploadHelper.getStartId(); 
 			
 			byte[] fileToUploadBytes = util.Bytes.serialiseObjectToByteArray(fileToUpload); 
 			
@@ -614,57 +666,52 @@ public class FileTransferClient {
 			
 			if (responseSplit[0].contentEquals(FileTransferProtocol.DOWNLOAD)) {
 				uploadHelper.setDownloaderPort(Integer.parseInt(responseSplit[1])); 
-				// TODO keep protocol in mind!
-				this.showNamedMessage("Downloader is on server port = " + Integer.parseInt(responseSplit[1])); //TODO efficiency
-				// TODO keep protocol in mind!
-				
-				// TODO now everything is known: start download helper
+				this.showNamedMessage("Downloader is on server port = " 
+						+ Integer.parseInt(responseSplit[1])); 
+
+				// now everything is known: start download helper
 				new Thread(uploadHelper).start();
-				
 				success = true;
 			} else {
 				this.showNamedError("Invalid response to upload announcement");
 				success = false;
 			}
 
-		} catch (SocketException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			this.showNamedError("Something went wrong: " + e.getLocalizedMessage());
 		} catch (EmptyResponseException e) {
 			this.showNamedError("Response from server was empty: " + e.getLocalizedMessage());
 		} catch (ServerFailureException e) {
-			this.showNamedError("FAILURE> " + e.getLocalizedMessage());
+			this.showNamedError("SERVER FAILURE> " + e.getLocalizedMessage());
 		}
-		
-		// TODO actual uploading of file takes place in helper
 
-				
 		return success;
 	}
 	
-	public boolean deleteSingleFile(File fileToUpload) {
+	/**
+	 * Request deletion of a single file to the server.
+	 * @param File fileToDelete (NOTE: file as on server!)
+	 * @return boolean indicating if succeeded
+	 */
+	public boolean deleteSingleFile(File fileToDelete) {
 		boolean success = false;
 		
-		this.showNamedMessage("WARNING: this deletes files on server!"); // TODO
+		this.showNamedMessage("WARNING: this deletes files on server!");
 		try {
 			String singleFileDeleteRequest = FileTransferProtocol.DELETE;
 			
-			byte[] fileToDeleteBytes = util.Bytes.serialiseObjectToByteArray(fileToUpload); 
+			byte[] fileToDeleteBytes = util.Bytes.serialiseObjectToByteArray(fileToDelete); 
 			
 			Packet responsePacket = this.requestServer(singleFileDeleteRequest, fileToDeleteBytes);
 			String[] responseSplit = this.getArguments(responsePacket.getPayloadString());
 			
 			if (responseSplit[0].contentEquals(FileTransferProtocol.DELETE)) {
-				this.showNamedMessage("File deleted!"); //TODO print more?
-				// TODO keep protocol in mind!
+				this.showNamedMessage("File deleted!"); 
 				success = true;
 			}
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			this.showNamedError("Something went wrong while serialising file object");
+			this.showNamedError("Something went wrong while serialising file object: " 
+					+ e.getLocalizedMessage());
 		} catch (EmptyResponseException e) {
 			this.showNamedError("Response from server was empty: " + e.getLocalizedMessage());
 		} catch (ServerFailureException e) {
@@ -674,6 +721,11 @@ public class FileTransferClient {
 		return success;
 	}
 	
+	/**
+	 * Request hash of a single file on the server.
+	 * @param File fileToCheck (NOTE: file as on client, will be matched to server!)
+	 * @return boolean indicating if succeeded
+	 */
 	public boolean checkFile(File fileToCheck) {
 		boolean success = false;
 
@@ -683,13 +735,14 @@ public class FileTransferClient {
 			if (sameHash) {
 				this.showNamedMessage("Local and remote files have the same hash: INTEGRITY OK");
 			} else {
-				this.showNamedMessage("Local and remote files have the different hash: INTEGRITY FAILED");
+				this.showNamedMessage("Local and remote files have the different hash:"
+						+ " INTEGRITY FAILED");
 			}
-
 			success = true;
 
 		} catch (NoMatchingFileException e) {
-			this.showNamedError("Something went wrong while comparing the files: " + e.getLocalizedMessage());
+			this.showNamedError("Something went wrong while comparing the files: "
+					 + e.getLocalizedMessage());
 		} catch (EmptyResponseException e) {
 			this.showNamedError("Response from server was empty: " + e.getLocalizedMessage());
 		} catch (ServerFailureException e) {
@@ -700,27 +753,26 @@ public class FileTransferClient {
 	}
 
 	/**
-	 * TODO
-	 * @param fileToCompare
-	 * @return
+	 * Compare hash of local file with hash of matching file on server.
+	 * @param fileToCompare (as on client)
+	 * @return boolean indicating if both files have same hash
 	 * @throws NoMatchingFileException 
 	 * @throws EmptyResponseException 
 	 * @throws ServerFailureException 
 	 */
-	public boolean compareLocalRemoteHash(File fileToCompare) throws NoMatchingFileException, EmptyResponseException, ServerFailureException {
-		boolean sameHash = false; // TODO defult to false??
-		String fileName = fileToCompare.getName(); // TODO search on path plus name?
+	public boolean compareLocalRemoteHash(File fileToCompare) 
+			throws NoMatchingFileException, EmptyResponseException, ServerFailureException {
+		boolean sameHash = false; // TODO default to false??
+		String fileName = fileToCompare.getName();
 
 		try {
-
 			String localHash = util.FileOperations.getHashHexString(fileToCompare);
-
-			String remoteHash = null;
-
 			this.showNamedMessage("Hash of local file: " + localHash);
 
+			String remoteHash = null;
+			
 			File fileOnServer = this.matchToServerFile(fileName);
-
+			
 			if (fileOnServer != null) {
 				String checkFileRequest = FileTransferProtocol.HASH +
 						FileTransferProtocol.DELIMITER +
@@ -734,7 +786,6 @@ public class FileTransferClient {
 				if (responseSplit[0].contentEquals(FileTransferProtocol.HASH)) {
 					remoteHash = responseSplit[1];
 					this.showNamedMessage("Hash of remote file: " + remoteHash);
-					// TODO keep protocol in mind!
 				}
 
 				if (remoteHash.equals(localHash)) {
@@ -744,18 +795,17 @@ public class FileTransferClient {
 				}
 
 			} else {
-				this.showNamedError("Matched file on server is null!"); // TODO something?
+				this.showNamedError("Matched file on server is null!"); 
 				throw new NoMatchingFileException("Matched file on server is null!");
 			}
 
 		} catch (NoSuchAlgorithmException | IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			this.showNamedError("Something went wrong while comparing the files: "
+					 + e.getLocalizedMessage());
 		} catch (NoMatchingFileException e) {
-			this.showNamedError("No matching file on the server to check!"); // TODO also print? 
+			this.showNamedError("No matching file on the server to check!"); 
 			throw new NoMatchingFileException("No matching file found on the server!");
 		} catch (ServerFailureException e) {
-			this.showNamedError(e.getLocalizedMessage()); // TODO also print? 
 			throw new ServerFailureException(e.getLocalizedMessage());
 		}
 
@@ -763,81 +813,93 @@ public class FileTransferClient {
 	}
 	
 	/**
-	 * TODO
-	 * @param listOfHelpers
-	 * @return
+	 * Manages helper threads: can pause/resume.
+	 * @param listOfHelpers to manage
+	 * @return boolean indicating if succeeded
 	 */
-	public boolean helperManager(List<Helper> listOfHelpers) { // TODO , Class<T> typeKey
+	public boolean helperManager(List<Helper> listOfHelpers) { 
 		boolean success = false;
 
-		this.showNamedMessage("Found helpers: \n" + Arrays.toString(listOfHelpers.toArray())); // TODO make nice UI
+		this.showNamedMessage("Found helpers: \n" + Arrays.toString(listOfHelpers.toArray()));
 
 		int selectedIndex = -1;
 		while (!(selectedIndex >= 0 && selectedIndex < listOfHelpers.size())) {
-			selectedIndex = TUI.getInt("Which helper to select?"); 
+			selectedIndex = textUI.getInt("Which helper to select?"); 
 		}
 
 		Helper selectedHelper = listOfHelpers.get(selectedIndex);
 
 		if (selectedHelper.isPaused()) {
-			if (TUI.getBoolean("Would you like to resume this helper?")) {
+			if (textUI.getBoolean("Would you like to resume this helper?")) {
 				selectedHelper.resume();
 			}
 		} else {
-			if (TUI.getBoolean("Would you like to pause this helper?")) {
+			if (textUI.getBoolean("Would you like to pause this helper?")) {
 				selectedHelper.pause();
 			}
 		}
-		
-		success = true; // TODO usefull here?
+		success = true;
 
 		return success;
 	}
 	
-	
+	/**
+	 * Get list of local files in client storage. 
+	 * @return File[] list of local Files
+	 */
 	public File[] getLocalFiles() {
-		File[] filesArray = new File(this.fileStorage.toString()).listFiles( // TODO only non-hidden
+		File[] filesArray = new File(this.fileStorage.toString()).listFiles(
 				new FileFilter() {
 					@Override
 					public boolean accept(File file) {
 						return !file.isHidden();
 					}
 				});
-
-		System.out.println(Arrays.toString(filesArray));
 		return filesArray;
 	}
 	
+	/**
+	 * Select a file from list of local files in client storage. 
+	 * @return File selected from local file storage.
+	 */
 	public File selectLocalFile() {
 		File[] localFiles = this.getLocalFiles();
 		
 		int selectedIndex = -1;
 		while (!(selectedIndex >= 0 && selectedIndex < localFiles.length)) {
-			selectedIndex = TUI.getInt("Which index to select?"); 
+			selectedIndex = textUI.getInt("Which index to select?"); 
 		}
 		return localFiles[selectedIndex];
 	}
 	
+	/**
+	 * Select a file from list of local files in client storage. 
+	 * @return File (as on server), selected from server file storage.
+	 */
 	public File selectServerFile() {
 		int selectedIndex = -1;
 		try {
 			this.requestListFiles();
 
 			while (!(selectedIndex >= 0 && selectedIndex < this.serverFiles.length)) {
-				selectedIndex = TUI.getInt("Which index to select?"); 
+				selectedIndex = textUI.getInt("Which index to select?"); 
 			}
 
 		} catch (IOException | PacketException | UtilDatagramException e) {
-			this.showNamedMessage("Something went wrong while refreshing"
+			this.showNamedError("Something went wrong while refreshing"
 					+ " the server file list: " + e.getLocalizedMessage());
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		}
 
 		return this.serverFiles[selectedIndex];
 	}
 	
-	public File matchToServerFile(String fileName) throws NoMatchingFileException { // TODO match on other then file name?
+	/**
+	 * Match file from client storage to a file on the server storage.
+	 * @param fileName (as local file) to match on server.
+	 * @return File (as on server), matching the local File.
+	 * @throws NoMatchingFileException
+	 */
+	public File matchToServerFile(String fileName) throws NoMatchingFileException {
 		File fileOnServer = null;
 		
 		try {
@@ -847,8 +909,6 @@ public class FileTransferClient {
 		} catch (IOException | PacketException | UtilDatagramException e) {
 			this.showNamedMessage("Something went wrong while communicating with"
 					+ " the server file list: " + e.getLocalizedMessage());
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		}
 		
 		List<File> matchesOnServer = new ArrayList<File>();
@@ -866,11 +926,12 @@ public class FileTransferClient {
 			fileOnServer = matchesOnServer.get(0);
 			this.showNamedMessage("One matching file found: " + fileOnServer);
 		} else { // more matching
-			this.showNamedMessage("Found matches: \n" + Arrays.toString(matchesOnServer.toArray())); // TODO make nice UI
+			this.showNamedMessage("Found matches: \n" 
+					+ Arrays.toString(matchesOnServer.toArray()));
 
 			int selectedIndex = -1;
 			while (!(selectedIndex >= 0 && selectedIndex < this.serverFiles.length)) {
-				selectedIndex = TUI.getInt("Which index is the correct match?"); 
+				selectedIndex = textUI.getInt("Which index is the correct match?"); 
 			}
 			fileOnServer = matchesOnServer.get(selectedIndex);
 		}
@@ -878,14 +939,15 @@ public class FileTransferClient {
 	}
 	
 	/**
-	 * TODO
-	 * @param requestString
-	 * @param requestBytes
-	 * @return
+	 * Make a request to the server, and receive response.
+	 * @param requestString part of the request
+	 * @param requestBytes part of the request
+	 * @return Packet response from the server
 	 * @throws EmptyResponseException 
 	 * @throws ServerFailureException 
 	 */
-	public Packet requestServer(String requestString, byte[] requestBytes) throws EmptyResponseException, ServerFailureException {
+	public Packet requestServer(String requestString, byte[] requestBytes) 
+			throws EmptyResponseException, ServerFailureException {
 		byte[] requestStringBytes = requestString.getBytes();
 		
 		byte[] bytesToServer = requestStringBytes;
@@ -895,8 +957,8 @@ public class FileTransferClient {
 		}
 		this.sendBytesToServer(bytesToServer, requestStringBytes.length);
 
-		// TODO now wait for response, 
-		Packet receivedPacket = this.receiveServerResponse(); // TODO handle null gracefully
+		// now wait for response 
+		Packet receivedPacket = this.receiveServerResponse();
 
 		if (receivedPacket == null) {
 			throw new EmptyResponseException("Response from server was null");
@@ -909,17 +971,23 @@ public class FileTransferClient {
 	}
 
 	/**
-	 * TODO
-	 * @param requestString
-	 * @return
+	 * Make a request to the server with only a requestString, and receive response.
+	 * @param requestString part of the request	 
+	 * @return Packet response from the server
 	 * @throws EmptyResponseException
 	 * @throws ServerFailureException 
 	 */
-	public Packet requestServer(String requestString) throws EmptyResponseException, ServerFailureException {
+	public Packet requestServer(String requestString) 
+			throws EmptyResponseException, ServerFailureException {
 		return this.requestServer(requestString, null);
 	}
 	
-	public void sendBytesToServer(byte[] bytesToSend, int byteOffset) { // TODO put in seperate utility?
+	/**
+	 * Send bytes to the server, contained a Packet.
+	 * @param bytesToSend to server
+	 * @param byteOffset due to string part
+	 */
+	public void sendBytesToServer(byte[] bytesToSend, int byteOffset) {
 		try { // to construct and send a packet
 			Packet packet = new Packet(
 						0, // TODO id
@@ -938,34 +1006,22 @@ public class FileTransferClient {
 			
 			this.showNamedMessage("Bytes send to server!");
 			
-		} catch (UnknownHostException | PacketException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (UtilByteException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (UtilDatagramException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+		} catch (PacketException | IOException | UtilByteException | UtilDatagramException e) {
+			this.showNamedError("Something went wrong while sending bytes: "
+					+ e.getLocalizedMessage());
 		}
 	}
 	
 	/**
-	 * TODO
-	 * @return
+	 * Receive response from server.
+	 * @return Packet response from server
 	 */
 	public Packet receiveServerResponse() {
 		this.showNamedMessage("Waiting for server response...");
 
 		Packet receivedPacket = null;
 		try {
-			//if the socket does not receive anything in 1 second, 
-			//it will timeout and throw a SocketTimeoutException
-			//you can catch the exception if you need to log, or you can ignore it
-			this.socket.setSoTimeout(10000); // TODO explain  and TODO set it permanently? in setup? 
+			this.socket.setSoTimeout(10000); //TODO set it permanently in setup? 
 
 			receivedPacket = TransportLayer.receivePacket(this.socket);
 
@@ -978,7 +1034,7 @@ public class FileTransferClient {
 			}
 
 		} catch (SocketTimeoutException e) { // on TimeOut
-			this.showNamedError("Receiving a server response timed out"); // TODO retry?
+			this.showNamedError("Receiving a server response timed out");
 			return null;
 		} catch (SocketException e) {
 			this.showNamedError("Something went wrong while receiving"
@@ -994,14 +1050,12 @@ public class FileTransferClient {
 	}
 	
 	/**
-	 * Shutdown server TODO (try with resources?!)
+	 * Shutdown client.
 	 */
 	public void shutdown() {
 		this.showNamedMessage("See you later!");
 		this.running = false;
-
-		// see example on github? 
-		this.socket.close(); // TODO make a method for this, ensure!
+		this.socket.close();
 
 	}
 	
@@ -1010,27 +1064,31 @@ public class FileTransferClient {
 	}
 	
 	/**
-	 * TODO cannot override from TUI?
-	 * @param message
+	 * Show message on the textUIT with name of this client.
+	 * @param message to display
 	 */
 	public void showNamedMessage(String message) {
-		TUI.showNamedMessage(this.name, message);
+		textUI.showNamedMessage(this.name, message);
 	}
 	
 	/**
-	 * TODO cannot override from TUI?
-	 * @param message
+	 * Show error on the textUIT with name of this client.
+	 * @param message to display
 	 */
 	public void showNamedError(String message) {
-		TUI.showNamedError(this.name, message);
+		textUI.showNamedError(this.name, message);
 	}
 	
 	// ------------------ Main --------------------------
 
+	/**
+	 * Use this main method to boot a client.
+	 * @param args
+	 */
 	public static void main(String[] args) {
 		System.out.println("Welcome to the FileTransfer Client! \n Starting...");
 		
-		int port; // TODO duplicate name: change? 
+		int port; 
 		
 		if (args.length < 0 || args.length > 1) {
 			System.out.println("Syntax: FileTranferClient <port>");
@@ -1045,7 +1103,6 @@ public class FileTransferClient {
 			
 		FileTransferClient client = new FileTransferClient(port);
 		System.out.println("Starting client...");
-		//new Thread(server).start();
 	}
 
 }
