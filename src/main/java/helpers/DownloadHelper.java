@@ -170,11 +170,15 @@ public class DownloadHelper implements Helper, Runnable {
 		//List<Packet> receivedPacketList = new ArrayList<Packet>(); TODO this could not be local! and now in run();
 
 		this.LFR = -1;
-		this.RWS = 1;
+		this.RWS = (FileTransferProtocol.MAX_ID + 1)/ 2 - 1;// 2; 
+		// TODO = SWS
 		this.startID = startID; // TODO or set with method and initially assume zero
 		
-		this.idWrapCounter = 0; // TODO only RWS of zero will set it first to zero TODO placement in file1
-
+		if (this.startID < (FileTransferProtocol.MAX_ID - this.RWS)) {
+			this.idWrapCounter = 0; // TODO only RWS of zero will set it first to zero TODO placement in file1
+		} else { // already one wraparound in IDs
+			this.idWrapCounter = 1;
+		}
 		/**
 		 * TODO dropped outside windo, not because security
 		 */
@@ -199,9 +203,9 @@ public class DownloadHelper implements Helper, Runnable {
 		} 
 
 		this.showNamedMessage("Total file size = " + this.totalFileSize + " bytes");
-		this.totalPackets = (int) Math.ceil(fileContents.length/FileTransferProtocol.MAX_PAYLOAD_LENGTH) +1;
-		this.showNamedMessage("Total number of packets to receive: " + this.totalPackets);
-		this.receivedPacketList = new ArrayList<Packet>(Collections.nCopies(60, null));
+		this.totalPackets = (int) Math.ceil(this.totalFileSize/FileTransferProtocol.MAX_PAYLOAD_LENGTH) +1;
+		this.showNamedMessage("Number of packets to receive: " + this.totalPackets);
+		this.receivedPacketList = new ArrayList<Packet>(Collections.nCopies(this.totalPackets, null));
 		
 		this.showNamedMessage("Receiving...");
 
@@ -281,9 +285,12 @@ public class DownloadHelper implements Helper, Runnable {
 
 
 		// tell the user
-		this.showNamedMessage("Received packet with ID = " + packet.getId()); // TODO debug info
+		this.showNamedMessage("Received packet with ID = " + packet.getId() + ", could be nr " + packetNr); // TODO debug info
 //		this.showNamedMessage("Received packet " + packetID + ", length="+packet.getPayloadLength()); // TODO debug info
 
+		System.out.println("Should be > LFR " + LFR);
+		System.out.println("Should be <= LFR + RWS " + (LFR + RWS));
+		
 		if (packetNr > LFR && packetNr <= LFR + RWS) {
 			this.showNamedMessage("Processing packet " + packetNr); // TODO debug info
 
@@ -307,7 +314,7 @@ public class DownloadHelper implements Helper, Runnable {
 				}
 			}
 
-			this.sendAck(packetNr);
+			this.sendAck(packetNr); // TODO or always ack: no, because ahead of window has to be resend (but resend below window?)
 		} else {
 			this.showNamedMessage("DROPPING packet with ID = " + packet.getId());
 			this.droppedPackets++;
@@ -473,6 +480,11 @@ public class DownloadHelper implements Helper, Runnable {
 	}
 	
 	public void shutdown() {
+		if (!this.complete) {
+			this.showNamedError("WARNING! preliminairy shutdown: transfer not complete!");
+		}
+		this.showNamedMessage("Helper is shutting down.");
+		
 		this.downloadSocket.close();
 	}
 	
@@ -488,13 +500,13 @@ public class DownloadHelper implements Helper, Runnable {
 	 * @return
 	 */
 	private int nrToId(int packetNumber) {
-		return (packetNumber + this.startID) % FileTransferProtocol.MAX_ID;
+		return (packetNumber + this.startID) % FileTransferProtocol.MAX_ID ;
 	}
 	
 	private int IdToNr(int packetID) {
 		int unwrappedId = -1; // TODO need to initialize
 		
-		int correctedId = packetID - this.startID;
+		int correctedId = packetID ;
 
 		
 		int previousWraparoundRangeID = correctedId 
@@ -507,7 +519,7 @@ public class DownloadHelper implements Helper, Runnable {
 //		System.out.println("LFR: " + receivedId); // TODO debug
 		
 		if (!(this.LFR > previousWraparoundRangeID)) { 
-			// check if packet from previous wraparound is already received (= expected earlier) TODO check with Djurre
+			// check if packet from previous wraparound is already received (= expected earlier)
 			unwrappedId = previousWraparoundRangeID;
 		} else {//if (this.currentPacketToSend > currentWraparoundId) {
 			// TODO no way to know is packet was already sent?!! TODO check with Djurre
@@ -519,7 +531,7 @@ public class DownloadHelper implements Helper, Runnable {
 //		System.out.println(unwrappedId); // TODO debug
 		
 		//return unwrappedId - this.startID; // TODO ????
-		return unwrappedId; // TODO ????
+		return unwrappedId - this.startID; // TODO will not return negative, als currentWraparound add correspondings mutiple of MAX_ID
 
 	}
 	

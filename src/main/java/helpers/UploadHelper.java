@@ -183,9 +183,11 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 		this.packetList = new ArrayList<Packet>();
 
 		this.LAR = -1;
-		this.SWS = 1;
+		this.SWS = (FileTransferProtocol.MAX_ID + 1)/ 2 - 1;//2;
+		// TODO http://netsys.ewi.utwente.nl/book/direct/reliable.html?highlight=sliding%20window%20size#finite-sequence-numbers-and-sliding-window
 
-		this.startID = new Random().nextInt((FileTransferProtocol.MAX_ID) + 1); // zero to max_ID
+		this.startID = 0; // TODO always starting at zero
+		// = new Random().nextInt((FileTransferProtocol.MAX_ID) + 1); // zero to max_ID
 		
 		this.totalResendPackets = 0;
 		this.thresholdResend = 25; // TODO explain in report!
@@ -252,9 +254,9 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 						continue;
 					}
 					
-					System.out.println("DEBUG"); // TODO
-					System.out.println(Arrays.toString(receivedPacket.getPayloadBytes()));
-					System.out.println(Arrays.toString(FileTransferProtocol.START_DOWNLOAD));
+//					System.out.println("DEBUG"); // TODO
+//					System.out.println(Arrays.toString(receivedPacket.getPayloadBytes()));
+//					System.out.println(Arrays.toString(FileTransferProtocol.START_DOWNLOAD));
 					
 					
 					if (Arrays.equals(receivedPacket.getPayloadBytes(), 
@@ -280,7 +282,7 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 			System.out.println("filePointer check: " + (filePointer >= fileContents.length));
 			System.out.println("ack check: " + (totalAckPackets == totalPackets));
 			
-			if ((currentPacketToSend <= LAR + SWS && currentPacketToSend <= totalPackets) 
+			if ((currentPacketToSend <= LAR + SWS && currentPacketToSend < totalPackets) // TODO index vs numberOf
 				&& !this.paused) { // TODO if paused only listen 
 				this.sendNextPacket();
 			} else {
@@ -299,9 +301,9 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 	
 	public void sendNextPacket() {
 		// inside send window size = send the packet
-		int packetID = nrToId(currentPacketToSend);
+		int packetID = nrToId(this.currentPacketToSend);
 		
-		if (packetID == 0 && currentPacketToSend != 0) {
+		if (packetID == 0 && this.currentPacketToSend != 0) {
 			this.idWrapCounter++;
 			this.showNamedMessage("packet ID wrap around"); // TODO debug
 		}
@@ -586,7 +588,7 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 	private int IdToNr(int packetID) {
 		int unwrappedId = -1; // TODO need to initialize
 
-		int correctedId = packetID - this.startID;
+		int correctedId = packetID ;
 		
 		int previousWraparoundRangeID = correctedId 
 				+ (this.idWrapCounter - 1) * FileTransferProtocol.MAX_ID;
@@ -605,6 +607,6 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 		}
 
 		//return unwrappedId - this.startID; // TODO ????
-		return unwrappedId; // TODO ????
+		return unwrappedId - this.startID; // TODO will not return negative, als currentWraparound add correspondings mutiple of MAX_ID
 	}
 }

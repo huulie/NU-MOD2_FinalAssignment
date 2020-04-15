@@ -152,7 +152,7 @@ public class FileTransferProtocol {
 	/**
 	 * TODO *8bits per bytes, to power two,  note max capacity of int (all over protocol!!)
 	 */
-	public static final int MAX_ID = (int) Math.pow(2, (double)((HEADER_ID_LAST - HEADER_ID_START) * 8))-1;
+	public static final int MAX_ID = (int) Math.pow(2, (double)((HEADER_ID_LAST - HEADER_ID_START+1) * 8))-1;
 	
 	/**
 	 * TODO .
