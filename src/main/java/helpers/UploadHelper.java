@@ -228,11 +228,9 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 			e.printStackTrace();
 		}
 
-		this.totalPackets = (int) Math.ceil(fileContents.length/FileTransferProtocol.MAX_PAYLOAD_LENGTH);
+		this.totalPackets = (int) Math.ceil(fileContents.length/FileTransferProtocol.MAX_PAYLOAD_LENGTH) +1; // TODO id to number of packets?
 		this.showNamedMessage("Total number of packets to send: " + this.totalPackets);
-		if (this.totalPackets >= FileTransferProtocol.MAX_ID) {
-			this.showNamedMessage("Note: ID wrap around will occur during transmission");
-		}
+
 	}
 	
 	/** 
@@ -271,14 +269,17 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 					e.printStackTrace();
 				}
 			}
-			this.showNamedMessage("Download initiated!");
+			this.showNamedMessage("Downloader initiated upload!");
 		}
 	}
 	
 	public void transferBytes() {
-		while (!(filePointer >= fileContents.length && totalAckPackets == totalPackets)) {
+		while (!(filePointer >= fileContents.length && totalAckPackets == totalPackets)) { 
 			// while not (reached end of the file AND all packets are acknowledged)
 
+			System.out.println("filePointer check: " + (filePointer >= fileContents.length));
+			System.out.println("ack check: " + (totalAckPackets == totalPackets));
+			
 			if ((currentPacketToSend <= LAR + SWS && currentPacketToSend <= totalPackets) 
 				&& !this.paused) { // TODO if paused only listen 
 				this.sendNextPacket();
@@ -287,6 +288,12 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 			}
 		}
 		this.showNamedMessage("Sending completed!"); 
+		
+		System.out.println("filePointer: " + this.filePointer);
+		System.out.println("File length: " + this.fileContents.length);
+		System.out.println("TotalAck: " + this.totalAckPackets);
+		System.out.println("TotalPackets: " + this.totalPackets);
+		
 		this.complete = true;
 	}
 	
@@ -390,12 +397,16 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 		boolean found = false;
 		//for (Packet p : packetList) { 
 		Packet p = this.packetList.get(nrToAck); 
-			if (p.getId() == nrToId(nrToAck)) { // TODO to check ?
+		if (p.getId() == nrToId(nrToAck)) { // TODO to check ?
+			if (!p.isAck()) {
 				p.setAck(true);
 				this.showNamedMessage("Packet " + nrToAck + " ACKed!");
 				totalAckPackets++;
-				found = true;
+			} else {
+				this.showNamedMessage("Packet " + nrToAck + " was already ACKed: duplicate!");
 			}
+			found = true;
+		}
 		//}
 		if (!found) {
 			this.showNamedError("Packet with number " + nrToAck + " not found!");

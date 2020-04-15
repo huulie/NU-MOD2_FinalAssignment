@@ -532,7 +532,7 @@ public class FileTransferClient {
 				int totalFileSize = Integer.parseInt(responseSplit[2]); 					// TODO keep protocol in mind!
 				this.showNamedMessage("Uploader reports total file size = " + totalFileSize + " bytes");
 				
-				int freeSpace = (int) this.fileStorage.toFile().getUsableSpace(); // TODO casting long to int!
+				long freeSpace = this.fileStorage.toFile().getUsableSpace(); // TODO comparing long to int! (ccasting introduces negative)
 				if (freeSpace > totalFileSize) {
 					downloadHelper.setTotalFileSize(totalFileSize); 
 					this.showNamedMessage("Free space remaining after download: " + (freeSpace-totalFileSize) + " bytes");
@@ -543,7 +543,7 @@ public class FileTransferClient {
 				}
 				
 				int startID = Integer.parseInt(responseSplit[3]); 					// TODO keep protocol in mind!
-				this.showNamedMessage("Uploader starts at ID" + startID);
+				this.showNamedMessage("Uploader starts at ID = " + startID);
 				downloadHelper.setStartID(startID);
 				
 				// TODO now everything is known: start download helper
@@ -566,7 +566,7 @@ public class FileTransferClient {
 		} catch (ServerFailureException e) {
 			this.showNamedError("FAILURE> " + e.getLocalizedMessage());
 		} catch (NotEnoughFreeSpaceException e) {
-			this.showNamedError("Not enough free space to store download"); // TODO handle here?!
+			this.showNamedError("Not enough free space to store download:" + e.getLocalizedMessage()); // TODO handle here?!
 		}
 		
 		// TODO actual downloading of file takes place in helper

@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import client.FileTransferClient;
@@ -61,6 +62,11 @@ public class DownloadHelper implements Helper, Runnable {
 	 * TODO: send only once, not every packet? 
 	 */
 	private int totalFileSize;
+	
+	/**
+	 * TODO
+	 */
+	private int totalPackets;
 	
 	/**
 	 * TODO
@@ -150,6 +156,7 @@ public class DownloadHelper implements Helper, Runnable {
 		}
 		
 		this.totalFileSize = totalFileSize;
+		
 		this.fileToWrite = fileToWrite;
 		this.complete = false;
 		
@@ -160,7 +167,7 @@ public class DownloadHelper implements Helper, Runnable {
 		
 		this.TUI = new UI.TUI();
 
-		List<Packet> receivedPacketList = new ArrayList<Packet>();
+		//List<Packet> receivedPacketList = new ArrayList<Packet>(); TODO this could not be local! and now in run();
 
 		this.LFR = -1;
 		this.RWS = 1;
@@ -192,20 +199,24 @@ public class DownloadHelper implements Helper, Runnable {
 		} 
 
 		this.showNamedMessage("Total file size = " + this.totalFileSize + " bytes");
+		this.totalPackets = (int) Math.ceil(fileContents.length/FileTransferProtocol.MAX_PAYLOAD_LENGTH) +1;
+		this.showNamedMessage("Total number of packets to receive: " + this.totalPackets);
+		this.receivedPacketList = new ArrayList<Packet>(Collections.nCopies(60, null));
+		
 		this.showNamedMessage("Receiving...");
 
 		if (initiate) { // TODO running on client
 			//		try (ProgressBar pb = new ProgressBar("Test", this.totalFileSize,1)) { 
 			// TODO update to 1 ms, also see declartive/builder on doc
-			try (ProgressBar pb = new ProgressBar("Test", this.totalFileSize, 1, 
-					System.err, ProgressBarStyle.COLORFUL_UNICODE_BLOCK, " Bytes",1, false, null)) {
-				pb.setExtraMessage("Downloading..."); // Set extra message at end of the bar
+//			try (ProgressBar pb = new ProgressBar("Test", this.totalFileSize, 1, 
+//					System.err, ProgressBarStyle.COLORFUL_UNICODE_BLOCK, " Bytes",1, false, null)) {
+//				pb.setExtraMessage("Downloading..."); // Set extra message at end of the bar
 
 				while (!this.complete) { // loop until we are done receiving the file
 					this.receiveBytes();
-					pb.stepTo(this.fileContents.length); // step directly to n // TODO this way also counting duplicates/resends!
-				} 
-				pb.setExtraMessage("Done!"); // Set extra message to display at the end of the bar
+//					pb.stepTo(this.fileContents.length); // step directly to n // TODO this way also counting duplicates/resends!
+//				} 
+//				pb.setExtraMessage("Done!"); // Set extra message to display at the end of the bar
 			}
 		} else { // TODO running on server
 			while (!this.complete) { // loop until we are done receiving the file
@@ -270,23 +281,35 @@ public class DownloadHelper implements Helper, Runnable {
 
 
 		// tell the user
+		this.showNamedMessage("Received packet with ID = " + packet.getId()); // TODO debug info
 //		this.showNamedMessage("Received packet " + packetID + ", length="+packet.getPayloadLength()); // TODO debug info
 
 		if (packetNr > LFR && packetNr <= LFR + RWS) {
-//			this.showNamedMessage("Processing packet " + packetID); // TODO debug info
-			
-			// append the packet's data part (excluding the header) to the fileContents array, first making it larger
-			int oldlength = fileContents.length;
-			int datalen = packet.getPayloadLength(); //packet.length - HEADERSIZE;
-			fileContents = Arrays.copyOf(fileContents, oldlength + datalen);
-			System.arraycopy(packet.getPayloadBytes(), 0, fileContents, oldlength, datalen); 
-			// TODO start at beginning payload
+			this.showNamedMessage("Processing packet " + packetNr); // TODO debug info
 
-			LFR = packetNr;
-			
+			this.receivedPacketList.add(packetNr, packet);
+
+
+			for (int iNext = 0; packetNr + iNext < this.receivedPacketList.size(); iNext++) {
+				
+				
+				Packet receivedPacket = this.receivedPacketList.get(packetNr + iNext);
+				if (receivedPacket != null) {
+					// append the packet's data to the fileContents array
+					int oldlength = fileContents.length;
+					int datalen = receivedPacket.getPayloadLength(); //packet.length - HEADERSIZE;
+					fileContents = Arrays.copyOf(fileContents, oldlength + datalen);
+					System.arraycopy(receivedPacket.getPayloadBytes(), 0, fileContents, oldlength, datalen); 
+				} else {	
+					// set last received to the packet before null (missing packet)
+					LFR = packetNr + iNext - 1; // TODO was packetNr
+					break;
+				}
+			}
+
 			this.sendAck(packetNr);
 		} else {
-			this.showNamedMessage("DROPPING packet " + packet.getId());
+			this.showNamedMessage("DROPPING packet with ID = " + packet.getId());
 			this.droppedPackets++;
 		}
 
@@ -302,6 +325,7 @@ public class DownloadHelper implements Helper, Runnable {
 		}
 		
 		this.sendBytesToUploader(packetID, FileTransferProtocol.ACK);
+		this.showNamedMessage("Packet " + nrToAck + " with ID = " + packetID + " ACK send");
 		
 		if (this.paused) {
 			this.sendBytesToUploader(packetID, FileTransferProtocol.PAUSE_DOWNLOAD); // TODO keep this id? 
@@ -354,6 +378,16 @@ public class DownloadHelper implements Helper, Runnable {
 	}
 
 	public void writeFile() {
+//		this.showNamedMessage("Building fileContent from packets");
+//		
+//		for (Packet p : this.receivedPacketList) {
+//		// append the packet's data part (excluding the header) to the fileContents array, first making it larger
+//		int oldlength = fileContents.length;
+//		int datalen = p.getPayloadLength(); //packet.length - HEADERSIZE;
+//		fileContents = Arrays.copyOf(fileContents, oldlength + datalen);
+//		System.arraycopy(p.getPayloadBytes(), 0, fileContents, oldlength, datalen); 
+//		}
+		
 		this.showNamedMessage("Writing file contents to file...");
 		long timestamp = System.currentTimeMillis();
 		util.FileOperations.setFileContents(this.fileContents, this.fileToWrite, timestamp);
