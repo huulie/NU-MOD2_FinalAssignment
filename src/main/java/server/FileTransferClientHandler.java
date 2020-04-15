@@ -67,7 +67,7 @@ public class FileTransferClientHandler implements Runnable {
 
 
 	/** The TUI of this FileTransferServer. */
-	private UI.TUI TUI; 
+	private userInterface.TUI TUI; 
 
 	private String name;
 
@@ -80,7 +80,7 @@ public class FileTransferClientHandler implements Runnable {
 	 * @param ownPort
 	 */
 	public FileTransferClientHandler(DatagramSocket socket, Packet initPacket, FileTransferServer server, String name) { // int port
-		this.TUI = new UI.TUI();
+		this.TUI = new userInterface.TUI();
 
 		this.socket = socket;
 		this.ownPort = socket.getLocalPort();

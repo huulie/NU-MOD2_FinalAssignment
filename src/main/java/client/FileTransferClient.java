@@ -16,7 +16,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import UI.TUICommands;
 import exceptions.EmptyResponseException;
 import exceptions.ExitProgram;
 import exceptions.NoMatchingFileException;
@@ -33,6 +32,7 @@ import network.Packet;
 import network.TransportLayer;
 import protocol.FileTransferProtocol;
 import server.FileTransferClientHandler;
+import userInterface.TUICommands;
 
 public class FileTransferClient {
 
@@ -72,7 +72,7 @@ public class FileTransferClient {
 	private String serverName;
 	
 	/** The TUI of this FileTransferServer. */
-	private UI.TUI TUI; 
+	private userInterface.TUI TUI; 
 	
 	/**
 	 * TODO
@@ -108,7 +108,7 @@ public class FileTransferClient {
 	 * @param port
 	 */
 	public FileTransferClient(int port) {
-		this.TUI = new UI.TUI();
+		this.TUI = new userInterface.TUI();
 		
 		this.fileStorageDirName = "FTCstorage";
 
@@ -387,6 +387,11 @@ public class FileTransferClient {
 					}
 					break;
 
+				case TUICommands.HELP:
+					// do something
+					this.TUI.printHelpMenu();
+					break;
+				
 				case TUICommands.EXIT:
 					// do something
 					this.shutdown();

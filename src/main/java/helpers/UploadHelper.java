@@ -106,7 +106,7 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 	private int currentPacketToSend;
 	
 	private String name;
-	private UI.TUI TUI;
+	private userInterface.TUI TUI;
 
 	/**
 	 * TODO
@@ -177,7 +177,7 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 		this.startTime = System.nanoTime();
 		this.duration = 0;
 		
-		this.TUI = new UI.TUI();
+		this.TUI = new userInterface.TUI();
 		
 
 		this.packetList = new ArrayList<Packet>();

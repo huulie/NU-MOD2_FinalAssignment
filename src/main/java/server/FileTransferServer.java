@@ -38,7 +38,7 @@ public class FileTransferServer implements Runnable {
 	private int next_client_no;
 
 	/** The TUI of this FileTransferServer. */
-	private UI.TUI TUI; 
+	private userInterface.TUI TUI; 
 
 	/** Network info for server. */
 	InetAddress ownAddress = null;
@@ -88,7 +88,7 @@ public class FileTransferServer implements Runnable {
 		this.next_client_no = 1;
 		this.clientsWaitingList = new ArrayList<>();
 
-		this.TUI = new UI.TUI();
+		this.TUI = new userInterface.TUI();
 		name = "FTServer"; // TODO fixed name, fallback if setup doesn't set it
 		
 		this.fileStorageDirName = "FTSstorage";

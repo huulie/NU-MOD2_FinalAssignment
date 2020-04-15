@@ -126,7 +126,7 @@ public class DownloadHelper implements Helper, Runnable {
 	private byte[] fileContents;
 	
 	private String name;
-	private UI.TUI TUI;
+	private userInterface.TUI TUI;
 
 	/** TODO
 	 * @param parent
@@ -165,7 +165,7 @@ public class DownloadHelper implements Helper, Runnable {
 		this.startTime = System.nanoTime();
 		this.duration = 0;
 		
-		this.TUI = new UI.TUI();
+		this.TUI = new userInterface.TUI();
 
 		//List<Packet> receivedPacketList = new ArrayList<Packet>(); TODO this could not be local! and now in run();
 
