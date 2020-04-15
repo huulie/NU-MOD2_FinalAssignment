@@ -6,20 +6,40 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 
+/**
+ * This class provides network layer functionalities.
+ * @author huub.lievestro
+ *
+ */
 public class NetworkLayer {
 
+	/**
+	 * Get network address by host name.
+	 * @param hostname to lookup
+	 * @return InetAddress belonging to that hostname
+	 * @throws UnknownHostException
+	 */
 	public static InetAddress getAdressByName(String hostname) throws UnknownHostException {
 		InetAddress address = InetAddress.getByName(hostname);
 		return address;
 	}
 	
+	/**
+	 * Get network address of localhost.
+	 * @return InetAddress belonging to localhost
+	 * @throws UnknownHostException
+	 */
 	public static InetAddress getOwnAddress() throws UnknownHostException  {
 		InetAddress address = InetAddress.getLocalHost();
 		return address;
-		// TODO maybe replace with more extensive search as in project GO
 	}
 	
-	public static InetAddress discoverLocalAddress() { // TODO remove?!
+	/**
+	 * Discover network address of localhost,
+	 * using a more advanced method, to find the preferred network interface.
+	 * @return InetAddress belonging to localhost
+	 */
+	public static InetAddress discoverLocalAddress() {
 		InetAddress localIP = null;
 		Socket discoverLocalIP = new Socket(); 
 		// this ways, it returns the preferred outbound IP:

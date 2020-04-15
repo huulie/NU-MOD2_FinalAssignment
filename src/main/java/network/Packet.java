@@ -6,52 +6,73 @@ import java.util.Arrays;
 import exceptions.PacketException;
 import protocol.FileTransferProtocol;
 
+/**
+ * Model of a Packet, 
+ * (as extension of a DatagramPacket, which is a final class).
+ * @author huub.lievestro
+ *
+ */
 public class Packet {
 
 	/**
-	 * TODO
+	 * Address of source of Packet.
 	 */
 	private InetAddress sourceAddress;
+	
+	/**
+	 * Address of destination of Packet.
+	 */
 	private InetAddress destinationAddress;
 	
 	/**
-	 * TODO
+	 * Port number of source of Packet.
 	 */
 	private int sourcePort;
+	
+	/**
+	 * Prot number of destination of Packet.
+	 */
 	private int destinationPort;
 
 	/**
-	 * TODO
+	 * ID of Packet
+	 * Note: should remain below MAX_ID from protocol.
 	 */
 	private int id;
+	
+	/**
+	 * Indicating if Packet is acknowledged (=true) or not.
+	 */
 	private boolean ack;
 	
 	/**
-	 * TODO
+	 * Payload of the Packet,
+	 * consisting of String followed by byte[] part.
 	 */
-	private byte[] payload; // was Integer[]
+	private byte[] payload; 
 	
 	/**
-	* TODO
+	* Length of payload in bytes.
 	*/
 	private int payloadLength;
 	
 	/**
-	 * TODO Indicating when some String is preceding the bytes
+	 * Index of byte where byte payload starts.
+	 * Non-zero when some String payload is preceding the bytes
 	 */
 	private int byteOffset;
 	
 	/**
-	 * TODO
-	 * @param id
-	 * @param sourceAddress
-	 * @param sourcePort
-	 * @param destinationAddress
-	 * @param destinationPort
-	 * @param payload
+	 * Create a Packet
+	 * @param id of new Packet
+	 * @param sourceAddress of new Packet
+	 * @param sourcePort of new Packet
+	 * @param destinationAddress of new Packet
+	 * @param destinationPort of new Packet
+	 * @param payload of new Packet
+	 * @param byteOffset of new Packet
 	 * @throws PacketException
 	 */
-	
 	public Packet(int id, InetAddress sourceAddress, int sourcePort, InetAddress destinationAddress,
 			int destinationPort, byte[] payload, int byteOffset) throws PacketException {
 		this.id = id;
@@ -62,24 +83,65 @@ public class Packet {
 		this.ack = false;
 		
 		this.setPayload(payload); 
-		// note: do not assign directly, because lenght will not be set! TODO
 		
 		this.byteOffset = byteOffset;
 	}
 	
 	/**
-	 * TODO create Packet witt only bytes
-	 * @param id
-	 * @param sourceAddress
-	 * @param sourcePort
-	 * @param destinationAddress
-	 * @param destinationPort
-	 * @param payload
+	 * Create a Packet, containing only byte[].
+	 * @param id of new Packet
+	 * @param sourceAddress of new Packet
+	 * @param sourcePort of new Packet
+	 * @param destinationAddress of new Packet
+	 * @param destinationPort of new Packet
+	 * @param payload of new Packet
 	 * @throws PacketException
 	 */
 	public Packet(int id, InetAddress sourceAddress, int sourcePort, InetAddress destinationAddress,
 			int destinationPort, byte[] payload) throws PacketException {
 		this (id,  sourceAddress,  sourcePort,  destinationAddress, destinationPort, payload, 0);
+	}
+	
+	/**
+	 * Set the payload of Packet
+	 * Note: do NOT set payload field directly: payload length will no be updated!
+	 * @param payload to put in Packet
+	 * @throws PacketException
+	 */
+	public void setPayload(byte[] payload) throws PacketException {
+		int length = payload.length;
+		
+		if (length <= FileTransferProtocol.MAX_PAYLOAD_LENGTH) {
+			this.payloadLength = length;
+			this.payload = payload;
+		} else {
+			throw new PacketException("Cannot create packet: payload too large");
+		}
+	}
+
+	/**
+	 * Get String payload of Packet (ignoring byte[] part).
+	 * @return String part of payload
+	 */
+	public String getPayloadString() {
+		if (this.byteOffset == 0) {
+			return "";
+		} else {
+			byte[] stringBytes = Arrays.copyOfRange(this.getPayload(), 0, this.byteOffset);
+			return new String(stringBytes);
+		}
+	}
+	
+	/**
+	 * Get byte[] payload of Packet (ignoring String part).
+	 * @return String part of payload
+	 */
+	public byte[] getPayloadBytes() {
+		if (this.byteOffset > this.payloadLength) {
+			return null;
+		} else {
+			return Arrays.copyOfRange(this.getPayload(), this.byteOffset, this.payloadLength); 
+		}
 	}
 	
 	public int getId() {
@@ -131,50 +193,8 @@ public class Packet {
 		return payloadLength;
 	}
 	
-	public void setPayload(byte[] payload) throws PacketException {
-		int length = payload.length;
-		
-		if (length <= FileTransferProtocol.MAX_PAYLOAD_LENGTH) {
-			this.payloadLength = length;
-			this.payload = payload;
-		} else {
-			throw new PacketException("Cannot create packet: payload too large");
-		}
-		
-	}
-	
 	public int getByteOffset() {
 		return byteOffset;
-	}
-
-	/**
-	 * TODO as a sort of "toString", still concerning one packet and placing it here makes naming much easier
-	 * @param 
-	 * @return
-	 */
-	public String getPayloadString() {
-		if (this.byteOffset == 0) {
-			return "";
-		} else {
-			byte[] stringBytes = Arrays.copyOfRange(this.getPayload(), 0, this.byteOffset);
-			// TODO: not minus one, because to is exclusive
-			return new String(stringBytes);
-		}
-	}
-	
-	/**
-	 * TODO as a sort of "toString", still concerning one packet and placing it here makes naming much easier
-	 * @param 
-	 * @return
-	 */
-	public byte[] getPayloadBytes() {
-		if (this.byteOffset > this.payloadLength) {
-			return null;
-		} else {
-			return Arrays.copyOfRange(this.getPayload(), this.byteOffset, this.payloadLength); 
-			// TODO length is already index  + 1
-			// TODO note to is exclusive
-		}
 	}
 	
 }
