@@ -76,7 +76,7 @@ public class FileTransferProtocol {
 	 * 	Arguments (separated by delimiter): int portOfDownloader
 	 * 	Bytes: File fileToDownload
 	 * 
-	 * When send by server: Respond to client sending DOWNLOAD.
+	 * When send by server: Respond to client sending UPLOAD.
 	 * 	Arguments (separated by delimiter): 
 	 * 		int portOfUploader; int totalFileSize (in bytes); int startID
 	 * 	Bytes: File[] fileToDownload (to client)
@@ -89,7 +89,7 @@ public class FileTransferProtocol {
 	 * 		int portOfUploader; int totalFileSize (in bytes); int startID
 	 * 	Bytes: File[] fileToUpload 
 	 * 
-	 * When send by server: Respond to client sending UPLOAD.
+	 * When send by server: Respond to client sending DOWNLOAD.
 	 * 	Arguments (separated by delimiter): int portOfDownloader
 	 * 	Bytes: File fileToUpload (to server)
 	 */
