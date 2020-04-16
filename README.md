@@ -14,7 +14,7 @@ _An "Unable to access jarfile" error may be solved by placing the file in anothe
 - download the FileTransferServer-1.0.0.jar and all other files with server in their names (see _releases_)
 - start the server by navigating to the folder containing the FileTransferServer-1.0.0.jar. Then type: `java -jar FileTransferServer-1.0.0.jar` and answer the questions in the terminal.
 
-#### on a Raspbarry Pi
+#### on a Raspberry Pi
 - install the Pi according to these instructions: https://github.com/nedap/nu-module-2/blob/master/pi_setup/setup.md
 - clone this repository to your local machine, connected to the same network as the Pi.
 - edit the build.gradle: add the Pi's hostname or IP on the indicated line.
