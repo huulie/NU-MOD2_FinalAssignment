@@ -6,9 +6,6 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
-import java.net.UnknownHostException;
-import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -18,212 +15,252 @@ import client.FileTransferClient;
 import exceptions.PacketException;
 import exceptions.UtilByteException;
 import exceptions.UtilDatagramException;
+import me.tongfei.progressbar.*;
 import network.Packet;
 import network.TransportLayer;
 import protocol.FileTransferProtocol;
 import server.FileTransferClientHandler;
 
-import me.tongfei.progressbar.*;
-
 
 /**
- * TODO maybe generalise to downloadHelper (both client and server)??
- * @author huub.lievestro
+ * DownloadHelper to download a file.
+ *  * @author huub.lievestro
  *
  */
-public class DownloadHelper implements Helper, Runnable {
+public class DownloadHelper implements Helper, Runnable, util.ITimeoutEventHandler {
 
 	/**
-	 * Coonected process TODO
+	 * Connected process, which started this helper.
 	 */
 	private Object parent;
 
 	/**
-	 * Socket used for download TODO
+	 * Socket used for download.
 	 */
 	private DatagramSocket downloadSocket;
 
 	/**
-	 * Address used by uploader TODO
+	 * Address used by uploader, to download from.
 	 */
 	private InetAddress uploaderAddress;
 
 	/**
-	 * Port used by uploader TODO
+	 * Port used by uploader, to download from.
 	 */
 	private int uploaderPort;
 
 	/**
 	 * Indicate running on client side: need to initiate (uploader will wait)
+	 * Note: this may be needed to let downloader open a way through Firewall(s) first.
 	 */
 	private boolean initiate;
 
 	/**
-	 * TODO: send only once, not every packet? 
+	 * Total file size to download.
 	 */
 	private int totalFileSize;
 	
 	/**
-	 * TODO
+	 * Number of packets to receive in total.
 	 */
 	private int totalPackets;
 	
 	/**
-	 * TODO
+	 * File object to download and write.
 	 */
 	File fileToWrite;
 	
 	/**
-	 * Indicating download complete TODO
+	 * Indicating download complete.
 	 */
 	private boolean complete;
 	
 	/**
-	 * TODO indicate if paused or not
+	 * Indicate if paused or not.
 	 */
 	private boolean paused;
 	
 	/**
-	 * (re)start time
+	 * (re)start time of download.
 	 */
 	long startTime;
 	
 	
 	/**
-	 * Duration of transfer, in nanoseconds
+	 * Duration of transfer, in nanoseconds.
 	 */
 	long duration;
 
 	/**
-	 * TODO
+	 * List of received packets (expected packets are included as null.
 	 */
 	private List<Packet> receivedPacketList;
 
 	/**
-	 * TODO LFR = lastFrameReceived, RWS = receive window size
+	 * Last Frame Received, from uploader. 
 	 */
 	private int LFR;
+	
+	/**
+	 * Receive Window Size,
+	 * represent how many out-of-order packets this receiver is willing to buffer.
+	 * Note: makes no sense to set >SWS: impossible for >SWS packets to arrive out of order
+	 */
 	private int RWS;
 	
 	/**
-	 * TODO will not be limiting: because LAR rtc is int
+	 * Count of how many times the ID has wrapped around. 
+	 * 	(wraparound = passed ID_MAX and started at zero again)
 	 */
 	private int idWrapCounter;
 
-	/**
-	 * TODO
+	/*
+	 * ID to use at start of transfer, when uploader sends first packet.
 	 */
 	private int startID;
 	
 	/**
-	 * 
+	 * Number of packets currently dropped, 
+	 * because they were out of receive window (not because security or other reasons).
 	 */
 	private int droppedPackets;
 	
 	/**
-	 * TODO
+	 * List of Packets needing an acknowledgement, 
+	 * because packet loss is not covered by retry from uploader.
+	 */
+	private List<Packet> packetNeedAck;
+	
+	/**
+	 * Index of packets needing Ack, being acknowledged by receiving any further packet.
+	 */
+	private int indexAcked;;
+	
+	/**
+	 * Number of packets currently resend.
+	 * (including duplicate resends)
+	 */
+	private int totalResendPackets;
+	
+	/**
+	 * Threshold of fraction of resend packets relative to total packets to transmit, in percentage
+	 * If above this threshold, the download will be aborted due to too unstable network. 
+	 */
+	private int thresholdResend;
+	
+	/**
+	 * Contents of the file, received from the uploader and to write on disk.
 	 */
 	private byte[] fileContents;
 	
-	private String name;
-	private userInterface.TUI TUI;
-
-	/** TODO
-	 * @param parent
-	 * @param downloadSocket
-	 * @param uploaderAddress
-	 * @param uploaderPort
-	 * @param initiate TODO update
+	/**
+	 * Name of this downloadHelper (mainly for printing named messages).
 	 */
-	public DownloadHelper(Object parent, DatagramSocket downloadSocket, InetAddress uploaderAddress, int uploaderPort,
+	private String name;
+	
+	/**
+	 * TUI, to provide status messages to user.
+	 */
+	private userInterface.TUI textUI;
+
+	/**
+	 * Create a new UploadHelper, and initialise instance variables.
+	 * @param parent creating this DownloadHelper
+	 * @param downloadSocket to use
+	 * @param uploaderAddress to download from
+	 * @param uploaderPort to download from
+	 * @param totalFileSize to download
+	 * @param fileToWrite to receive and write
+	 * @param startID where te uploader will start
+	 */
+	public DownloadHelper(Object parent, DatagramSocket downloadSocket,
+			InetAddress uploaderAddress, int uploaderPort,
 			int totalFileSize, File fileToWrite, int startID) {
 		this.parent = parent;
 		this.downloadSocket = downloadSocket;
 		this.uploaderAddress = uploaderAddress;
 		this.uploaderPort = uploaderPort;
 		
-		//this.initiate = initiate;
-		if (parent instanceof FileTransferClient) { // TODO or just input manually?
+		if (parent instanceof FileTransferClient) { 
 			this.initiate = true;
-			this.name = ((FileTransferClient) parent).getName() + "_Downloader-" + fileToWrite.getName();
+			this.name = ((FileTransferClient) parent).getName() 
+					+ "_Downloader-" + fileToWrite.getName();
 		} else if (parent instanceof FileTransferClientHandler) {
 			this.initiate = false;
-			this.name = ((FileTransferClientHandler) parent).getName() + "_Downloader-" + fileToWrite.getName();
+			this.name = ((FileTransferClientHandler) parent).getName() 
+					+ "_Downloader-" + fileToWrite.getName();
 		} else {
 			this.name = "Downloader-" + fileToWrite.getName();
 			this.showNamedError("Unknown parent object type!");
-			// TODO set initiate or not? 
+			this.showNamedError("Will iniitalise, to be sure... ");
+			this.initiate = true;  
 		}
 		
 		this.totalFileSize = totalFileSize;
-		
 		this.fileToWrite = fileToWrite;
 		this.complete = false;
 		
 		this.paused = false; 
-		//this.startTime = LocalDateTime.now(); TODO
 		this.startTime = System.nanoTime();
 		this.duration = 0;
 		
-		this.TUI = new userInterface.TUI();
-
-		//List<Packet> receivedPacketList = new ArrayList<Packet>(); TODO this could not be local! and now in run();
+		this.textUI = new userInterface.TUI();
 
 		this.LFR = -1;
-		this.RWS = (FileTransferProtocol.MAX_ID + 1)/ 2 - 1;// 2; 
-		// TODO = SWS
-		this.startID = startID; // TODO or set with method and initially assume zero
+		this.RWS = 10; 
+		//makes no sense to set >SWS: impossible for >SWS packets to arrive out of order
 		
+		this.startID = startID;
 		if (this.startID < (FileTransferProtocol.MAX_ID - this.RWS)) {
-			this.idWrapCounter = 0; // TODO only RWS of zero will set it first to zero TODO placement in file1
+			this.idWrapCounter = 0;
 		} else { // already one wraparound in IDs
 			this.idWrapCounter = 1;
 		}
-		/**
-		 * TODO dropped outside windo, not because security
-		 */
+
 		this.droppedPackets = 0;
 		
-	
-
-		// create the array that will contain the file contents
-		// note: we don't know yet how large the file will be, so the easiest (but not most efficient)
-		//   is to reallocate the array every time we find out there's more data
-		fileContents = new byte[0];
+		this.totalResendPackets = 0;
+		this.thresholdResend = 25;
+		this.packetNeedAck = new ArrayList<Packet>();
+		this.indexAcked = -1; // no packet acked
+		
+		fileContents = new byte[0]; 
+		// Note: totalSize is known, but this array only keeps actually arrived bytes
 	}
 
-
+	/**
+	 * Download file.
+	 */
 	@Override
 	public void run() {
 		this.showNamedMessage("Starting download helper...");
 
-		
 		if (initiate) {
 			this.initiateTransfer();
 		} 
 
 		this.showNamedMessage("Total file size = " + this.totalFileSize + " bytes");
-		this.totalPackets = (int) Math.ceil(this.totalFileSize/FileTransferProtocol.MAX_PAYLOAD_LENGTH) +1;
+		this.totalPackets = (int)
+				Math.ceil(this.totalFileSize / FileTransferProtocol.MAX_PAYLOAD_LENGTH) + 1;
 		this.showNamedMessage("Number of packets to receive: " + this.totalPackets);
-		this.receivedPacketList = new ArrayList<Packet>(Collections.nCopies(this.totalPackets, null));
+		this.receivedPacketList = new ArrayList<Packet>(
+				Collections.nCopies(this.totalPackets, null));
 		
 		this.showNamedMessage("Receiving...");
 
-		if (initiate) { // TODO running on client
-			//		try (ProgressBar pb = new ProgressBar("Test", this.totalFileSize,1)) { 
-			// TODO update to 1 ms, also see declartive/builder on doc
-//			try (ProgressBar pb = new ProgressBar("Test", this.totalFileSize, 1, 
-//					System.err, ProgressBarStyle.COLORFUL_UNICODE_BLOCK, " Bytes",1, false, null)) {
-//				pb.setExtraMessage("Downloading..."); // Set extra message at end of the bar
+		if (initiate) { // running on a client: show progress bar
+			try (ProgressBar pb = new ProgressBar("Test", this.totalFileSize, 1, 
+					System.out, ProgressBarStyle.COLORFUL_UNICODE_BLOCK, " Bytes", 1, true, null)) {
+				pb.setExtraMessage("Downloading..."); 
 
-				while (!this.complete) { // loop until we are done receiving the file
+				while (!this.complete) { 
 					this.receiveBytes();
-//					pb.stepTo(this.fileContents.length); // step directly to n // TODO this way also counting duplicates/resends!
-//				} 
-//				pb.setExtraMessage("Done!"); // Set extra message to display at the end of the bar
+					pb.stepTo(this.fileContents.length);
+				} 
+				pb.setExtraMessage("Done!"); 
 			}
-		} else { // TODO running on server
-			while (!this.complete) { // loop until we are done receiving the file
+		} else { // running on server
+			while (!this.complete) {
 				this.receiveBytes();
 			} 
 		}
@@ -234,179 +271,265 @@ public class DownloadHelper implements Helper, Runnable {
 		this.showStats();
 		this.showNamedMessage("Download complete: helper shutting down");
 		this.shutdown();
-		
-
 	}
 
+	/** 
+	 * Send initiation by downloader,
+	 *  (may be needed to let downloader open a way through Firewall(s) first).
+	 */
 	public void initiateTransfer() {
-		this.sendBytesToUploader(0, FileTransferProtocol.START_DOWNLOAD); // TODO id?
+		this.sendBytesToUploader(0, FileTransferProtocol.START_DOWNLOAD, true);
+		// uploader will not retry (opposite to when ack is lost): so require ack 
 		this.showNamedMessage("Download initiated...");
 	}
 
+	/**
+	 * Transfer the byte[] of the File of the uploader, contained in Packets.
+	 */
 	public void receiveBytes() {
-		// try to receive a packet from the network layer
-		try {
-			
-			Packet packet = TransportLayer.receivePacket(this.downloadSocket);
+		try { //to receive a packet from the network layer
 
+			Packet receivedPacket = TransportLayer.receivePacket(this.downloadSocket);
 
-			// if we indeed received a packet
-			if (packet != null) {
-				this.processPacket(packet);
-				this.checkComplete(); // only stop when whole file is in 
-			} else {
-				// wait ~10ms (or however long the OS makes us wait) before trying again
+			if (receivedPacket != null) {
+				if (this.checkSource(receivedPacket)) { // if not: do nothing = drop packet
+					this.ackAllPackets();
+					this.processPacket(receivedPacket);
+					this.checkComplete();
+				}
+			} else { // wait ~10ms (or however long the OS makes us wait) before trying again
 				try {
+					this.showNamedError("Receiving packet was null: dropping it and trying again");
 					Thread.sleep(10);
 				} catch (InterruptedException e) {
 					this.showNamedError("INTERRUPTED EXCEPTION occured");
-					//this.complete = true; // TODO
 				}
 			}
-		} catch (SocketTimeoutException e) {
+			
+		} catch (SocketTimeoutException eTO) {
 			this.showNamedMessage("Socket timed-out: retry receive");
 			this.receiveBytes();
-		} catch (IOException | PacketException | UtilDatagramException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
+		} catch (IOException | PacketException | UtilDatagramException e) {
+			this.showNamedError("Receiving packet failed: " + e.getLocalizedMessage());
+			this.showNamedError("Downloader continues, but may be something missing!");
 		}
 	}
 	
-	public void processPacket(Packet packet) {
-		
-		if (!(packet.getSourceAddress().equals(this.uploaderAddress)
-				&& packet.getSourcePort() == this.uploaderPort)) { 
-			this.showNamedError("SECURITY WARNING: this response is NOT"
-					+ " coming for known uploader > dropping it");
-			return;
+	/**
+	 * Process received Packet with byte[] from uploader.
+	 * Security note: source should already be checked when receiving packet!
+	 * @param packet to process
+	 */
+	public void processPacket(Packet receivedPacket) {
+
+		int packetNr = this.idToNr(receivedPacket.getId());
+
+		if (!initiate) { // running on server: more textual output
+			this.showNamedMessage("Received packet with ID = " 
+					+ receivedPacket.getId() + ", could be nr " + packetNr);
 		}
-		
-		int packetNr = this.IdToNr(packet.getId());
 
+		if (packetNr > LFR && packetNr <= LFR + RWS) { // = inside receive window
+			if (!initiate) { // running on server: more textual output
+				this.showNamedMessage("Processing packet " + packetNr);
+			}
 
-		// tell the user
-		this.showNamedMessage("Received packet with ID = " + packet.getId() + ", could be nr " + packetNr); // TODO debug info
-//		this.showNamedMessage("Received packet " + packetID + ", length="+packet.getPayloadLength()); // TODO debug info
-
-		System.out.println("Should be > LFR " + LFR);
-		System.out.println("Should be <= LFR + RWS " + (LFR + RWS));
-		
-		if (packetNr > LFR && packetNr <= LFR + RWS) {
-			this.showNamedMessage("Processing packet " + packetNr); // TODO debug info
-
-			this.receivedPacketList.add(packetNr, packet);
-
+			this.receivedPacketList.add(packetNr, receivedPacket);
 
 			for (int iNext = 0; packetNr + iNext < this.receivedPacketList.size(); iNext++) {
-				
-				
-				Packet receivedPacket = this.receivedPacketList.get(packetNr + iNext);
-				if (receivedPacket != null) {
-					// append the packet's data to the fileContents array
+				Packet nextPacket = this.receivedPacketList.get(packetNr + iNext);
+				if (nextPacket != null) { // append the packet's data to the fileContents array
 					int oldlength = fileContents.length;
-					int datalen = receivedPacket.getPayloadLength(); //packet.length - HEADERSIZE;
+					int datalen = nextPacket.getPayloadLength();
 					fileContents = Arrays.copyOf(fileContents, oldlength + datalen);
-					System.arraycopy(receivedPacket.getPayloadBytes(), 0, fileContents, oldlength, datalen); 
-				} else {	
-					// set last received to the packet before null (missing packet)
-					LFR = packetNr + iNext - 1; // TODO was packetNr
+					System.arraycopy(nextPacket.getPayloadBytes(),
+							0, fileContents, oldlength, datalen); 
+				} else { // set last received to the packet before null packet (= to receive)
+					LFR = packetNr + iNext - 1;
 					break;
 				}
 			}
-
-			this.sendAck(packetNr); // TODO or always ack: no, because ahead of window has to be resend (but resend below window?)
+			this.sendAck(packetNr);
+		
+		} else if (packetNr < LFR) { // this packet was already ACKed, but maybe ACK got lost
+			this.sendAck(packetNr); // resend ACK
+		
 		} else {
-			this.showNamedMessage("DROPPING packet with ID = " + packet.getId());
+			this.showNamedMessage("DROPPING packet with ID = " + receivedPacket.getId());
 			this.droppedPackets++;
 		}
-
 	}
 
+	/**
+	 * Send acknowledgement packet to uploader, and pause packet if downloader wants to pause.
+	 * Note: also checks for ID wraparound (= going beyond MAX_ID and starting at zero again)
+	 * @param nrToAck to uploader
+	 */
 	public void sendAck(int nrToAck) {
 		int packetID = nrToId(nrToAck);
 		
-		int maxIdReceived = nrToId(nrToAck + RWS) ; // TODO naming
-		if (maxIdReceived == 0) {
-			this.idWrapCounter++;
-			this.showNamedMessage("packet ID wrap around"); // TODO debug
-		}
-		
-		this.sendBytesToUploader(packetID, FileTransferProtocol.ACK);
+		this.sendBytesToUploader(packetID, FileTransferProtocol.ACK, false);
 		this.showNamedMessage("Packet " + nrToAck + " with ID = " + packetID + " ACK send");
 		
-		if (this.paused) {
-			this.sendBytesToUploader(packetID, FileTransferProtocol.PAUSE_DOWNLOAD); // TODO keep this id? 
+		// check if ID could wrap around in the new receive window:
+		int maxIdToReceived = nrToId(nrToAck + RWS); 
+		if (maxIdToReceived == 0) {
+			this.idWrapCounter++;
+			//this.showNamedMessage("packet ID wrap around"); // for debugging
+		}
+
+		if (this.paused) { // let uploader know that downloader wants to pause transfer
+			this.sendBytesToUploader(packetID, FileTransferProtocol.PAUSE_DOWNLOAD, false);
 		}
 	}
 	
+	/**
+	 * Check if the download is complete, by comparing actual received bytes to totalFileSize.
+	 * Note: sets instance variable complete to true, doesn't return a boolean.
+	 */
 	public void checkComplete() {
 		if (fileContents.length >= this.totalFileSize) {
-//			this.showNamedMessage("File received completely"); // TODO after progressbar
 			this.complete = true;
 		} else {
 			this.complete = false;
 		}
-
 	}
 
-	public void sendBytesToUploader(int id, byte[] bytesToSend) { // TODO put in seperate utility?
-		try { // to construct and send a packet
-			Packet packet = new Packet(
-					id, 
-					this.downloadSocket.getLocalAddress(), // TODO request once and store? pass on?
-					this.downloadSocket.getLocalPort(), 
-					this.uploaderAddress, 
-					this.uploaderPort,
-					bytesToSend
-					); // TODO only sending bytes, so no byteOffset
-
-			TransportLayer.sendPacket(
-					this.downloadSocket,
-					packet,
-					this.uploaderPort
-					); 
-
-//			this.showNamedMessage("Bytes send!"); // TODO debug info
-
-		} catch (UnknownHostException | PacketException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (UtilByteException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (UtilDatagramException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-
-	}
-
+	/**
+	 * Write the received bytes to File (on more permanent storage).
+	 * Note: if writing fails, user is asked if helper should try again.
+	 */
 	public void writeFile() {
-//		this.showNamedMessage("Building fileContent from packets");
-//		
-//		for (Packet p : this.receivedPacketList) {
-//		// append the packet's data part (excluding the header) to the fileContents array, first making it larger
-//		int oldlength = fileContents.length;
-//		int datalen = p.getPayloadLength(); //packet.length - HEADERSIZE;
-//		fileContents = Arrays.copyOf(fileContents, oldlength + datalen);
-//		System.arraycopy(p.getPayloadBytes(), 0, fileContents, oldlength, datalen); 
-//		}
-		
 		this.showNamedMessage("Writing file contents to file...");
-		long timestamp = System.currentTimeMillis();
 		try {
 			util.FileOperations.setFileContents(this.fileContents, this.fileToWrite);
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			this.showNamedError("Writing of file failed: " + e.getLocalizedMessage());
+			if (this.textUI.getBoolean("Try again?")) {
+				this.writeFile();
+			} else {
+				this.showNamedError("File not written, downloadHelper going to shutdown");
+				this.shutdown();
+			}
 		}
 		this.showNamedMessage("... file written to " + this.fileToWrite.getAbsolutePath());
 	}
 	
+	/**
+	 * Send byte[] to the corresponding uploadHelper, contained in a Packet,
+	 * and, if required, resend this Packet if not acknowledged by any further received packets.
+	 * @param id of the Packet to send.
+	 * @param bytesToSend to uploader
+	 */
+	public void sendBytesToUploader(int id, byte[] bytesToSend, boolean requireAck) {
+		try { // to construct and send a packet
+			Packet packet = new Packet(
+					id, 
+					this.downloadSocket.getLocalAddress(),
+					this.downloadSocket.getLocalPort(), 
+					this.uploaderAddress, 
+					this.uploaderPort,
+					bytesToSend
+					);
 
+			this.sendPacketToUploader(packet);
+			
+			if (requireAck) { // here: Ack = receiving any packet from uploader
+				util.TimeOut.setTimeOut(1000, this, packet); 
+			}
+			
+			//this.showNamedMessage("Bytes send!"); // for debugging
+
+		} catch (PacketException e) {
+			this.showNamedError("Sending packet failed: " + e.getLocalizedMessage());
+			this.showNamedError("Downloader continues, "
+					+ "but something (probably an ACK) may be missing!");
+		}
+	}
+	
+	/**
+	 * Send packet to the corresponding downloadHelper.
+	 * @param packet to send to downloader.
+	 */
+	public void sendPacketToUploader(Packet packet) {
+		try {
+			TransportLayer.sendPacket(
+					this.downloadSocket,
+					packet,
+					this.uploaderPort
+			);
+		} catch (IOException | UtilByteException | UtilDatagramException e) {
+			this.showNamedError("Sending packet failed: " + e.getLocalizedMessage());
+			this.showNamedError("Downloader continues, "
+					+ "but something (probably an ACK) may be missing!");
+		}
+	}
+	
+	/**
+	 * If time-out elapsed and packet is not acknowledged: resend packet.	
+	 * @param tag Object that called timeoutElapsed	    
+	 */
+	@Override
+	public void timeoutElapsed(Object tag) {
+		Packet packet = (Packet) tag;
+		if (!packet.isAck()) {
+			this.showNamedMessage("TIME OUT packet with ID = " 
+					+ packet.getId() + " without ACK: resend!");
+			sendPacketToUploader(packet);
+			
+			this.restrictResend(packet);
+		}
+	}
+	
+	/**
+	 * Set ack to true on all packets needing an acknowledgement.
+	 * Note: receiving any further packet from uploader is used as implicit ack.
+	 */
+	private void ackAllPackets() {
+		int nrPacketsNeedingAck = this.packetNeedAck.size();
+		if (nrPacketsNeedingAck > 0 && this.indexAcked < nrPacketsNeedingAck) {
+			for (int i = this.indexAcked + 1; i < nrPacketsNeedingAck; i++) {
+				this.packetNeedAck.get(i).setAck(true);
+			}
+		} 
+		// else: no packets in need of an acknoledgement
+	}
+	
+	/**
+	 * Stops resending timed-out packets when number of resends is above threshold.
+	 * @param packet that is being resend
+	 */
+	public synchronized void restrictResend(Packet packet) {
+		this.totalResendPackets++;
+		
+		int currentResendRatio = this.totalResendPackets / this.totalPackets * 100;
+		if (currentResendRatio > this.thresholdResend) {
+			this.showNamedError("Relative packet resend ratio of " + currentResendRatio 
+					+ " is above threshold (" + this.thresholdResend + "):"
+							+ " network too unreliable = aborting transfer");
+			this.showNamedError("Cannot continue to upload: going to shutdown");
+			this.shutdown();
+
+			packet.setAck(true); // TODO not actually true, abort timeout in other way!
+		}
+	}
+
+	/**
+	 * Check if source of Packet is the corresponding uploader.
+	 * @param receivedPacket to check
+	 * @return true if source if the corresponding uploader, and false if not.
+	 */
+	public boolean checkSource(Packet receivedPacket) {
+		if (!(receivedPacket.getSourceAddress().equals(this.uploaderAddress) 
+				&& receivedPacket.getSourcePort() == this.uploaderPort)) { 
+			this.showNamedError("SECURITY WARNING: this response is NOT"
+					+ " coming for known downloader > dropping it");
+			return false;
+		} else {
+			return true;
+		}
+	}
+	
 	public void setUploaderPort(int uploaderPort) {
 		this.uploaderPort = uploaderPort;
 	}
@@ -419,36 +542,43 @@ public class DownloadHelper implements Helper, Runnable {
 		this.startID = startID;
 	}
 
-
+	/**
+	 * Pause this downloader.
+	 * Note: working indirectly, uploader is asked to pause transfer via a PAUSE packet
+	 */
 	public synchronized void pause() {
 		this.paused = true;
-		this.sendBytesToUploader(0, FileTransferProtocol.PAUSE_DOWNLOAD); // TODO  id? 
+		this.sendBytesToUploader(0, FileTransferProtocol.PAUSE_DOWNLOAD, false);
 		this.duration += System.nanoTime() - this.startTime;
 		
 		try {
-			this.downloadSocket.setSoTimeout(1000); // TODO otherwise, will block in .receive and not transmit local resume
+			this.downloadSocket.setSoTimeout(1000); 
+			// otherwise, thread will block in .receive and not be able to get local resume command
 		} catch (SocketException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			this.showNamedError("Setting socket time-out failed: " + e.getLocalizedMessage());
+			this.showNamedError("Uploader continues, "
+					+ "but may not continue while waiting for RESUME packet!");
 		} 
-		
 		this.showNamedMessage("=PAUSED");
 	}
 	
+	/**
+	 * Resumes this uploader.
+	 * Note: working indirectly, uploader is asked to resume transfer via a RESUME packet
+	 */
 	public synchronized void resume() {
 		this.paused = false;
-		this.sendBytesToUploader(0, FileTransferProtocol.RESUME_DOWNLOAD); // TODO ACK, to resend when lost! 
-		this.startTime = System.nanoTime(); // restart timer
+		this.sendBytesToUploader(0, FileTransferProtocol.RESUME_DOWNLOAD, true); 
+		// uploader will not retry (opposite to when ack is lost): require ack 
+		this.startTime = System.nanoTime(); // restart times
 		
 		try {
-			this.downloadSocket.setSoTimeout(0); // TODO revert socket to default operation
+			this.downloadSocket.setSoTimeout(0); /// revert socket to default operation
 		} catch (SocketException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} 
-		
-		this.showNamedMessage("=RESUMED"); // TODO not able to see difference between paused or otherwise non-sending uploader
-		// TODO so not able to resume download from paused uploader: blocking in receive
+			this.showNamedError("Removing socket time-out failed: " + e.getLocalizedMessage());
+			this.showNamedError("Uploader continues, but socket may time out!");
+		} 	
+		this.showNamedMessage("=RESUMED"); 
 	}
 	
 	public boolean isPaused() {
@@ -456,89 +586,86 @@ public class DownloadHelper implements Helper, Runnable {
 	}
 	
 	/**
-	 * TODO cannot override from TUI?
-	 * @param message
+	 * Show statistic of this downloader.
 	 */
-	public void showNamedMessage(String message) {
-		TUI.showNamedMessage(this.name, message);
-	}
-	
-	/**
-	 * TODO cannot override from TUI?
-	 * @param message
-	 */
-	public void showNamedError(String message) {
-		TUI.showNamedError(this.name, message);
-	}
-	
 	public void showStats() {
 		this.showNamedMessage("Transferred file: " + fileToWrite.getName());
 		this.showNamedMessage("Transfer complete: " + this.complete);
 		this.showNamedMessage("-------------------------------->");
 		this.showNamedMessage("Total file size: " + this.totalFileSize + " bytes");
-		this.showNamedMessage("Transfer duration: " + this.duration + " nanoseconds"); // TODO units
-		this.showNamedMessage("Average transferspeed: " + (this.totalFileSize / this.duration) + " bytes/nanosec"); // TODO units?
+		this.showNamedMessage("Transfer duration: " + (this.duration * 1e-6) + " milliseconds"); 
+		this.showNamedMessage("Average transferspeed: " 
+				+ (this.totalFileSize / (this.duration * 1e-9)) + " bytes/second"); 
 		this.showNamedMessage("Number of dropped packets: " + this.droppedPackets);
 		this.showNamedMessage("--------------------------------<");
-
-
 	}
 	
+	/**
+	 * Shutdown this downloadHelper (displays warning if download not complete).
+	 */
 	public void shutdown() {
 		if (!this.complete) {
 			this.showNamedError("WARNING! preliminairy shutdown: transfer not complete!");
 		}
 		this.showNamedMessage("Helper is shutting down.");
-		
 		this.downloadSocket.close();
 	}
 	
+	/**
+	 * Show message on the textUIT with name of this downloadHelper.
+	 * @param message to display
+	 */
+	public void showNamedMessage(String message) {
+		textUI.showNamedMessage(this.name, message);
+	}
+	
+	/**
+	 * Show error on the textUIT with name of this downloadHelper.
+	 * @param message to display
+	 */
+	public void showNamedError(String message) {
+		textUI.showNamedError(this.name, message);
+	}
+
 	@Override 
 	public String toString() {
 		return this.name;
 	}
 	
-	// private methods //TODO why make private? TODO or in utility?! >> note static to use intancevar
+	// private methods ----------------------------------------------------------
+	
 	/**
-	 * TODO
-	 * @param packetNumber
-	 * @return
+	 * Convert packet number to packet ID.
+	 * @param packetNumber to convert
+	 * @return int corresponding packet ID
 	 */
 	private int nrToId(int packetNumber) {
-		return (packetNumber + this.startID) % FileTransferProtocol.MAX_ID ;
+		return (packetNumber + this.startID) % FileTransferProtocol.MAX_ID;
 	}
 	
-	private int IdToNr(int packetID) {
-		int unwrappedId = -1; // TODO need to initialize
+	/**
+	 * Convert packet ID to packet number.
+	 * @param packetID to convert
+	 * @return corresponding packet number
+	 */
+	private int idToNr(int packetID) {
+		int unwrappedId = -1;
 		
-		int correctedId = packetID ;
+		int correctedId = packetID;
 
-		
+		// determine in which range the ID is most likely coming from:
 		int previousWraparoundRangeID = correctedId 
 				+ (this.idWrapCounter - 1) * FileTransferProtocol.MAX_ID;
 		int currentWraparoundRangeID = correctedId 
 				+ (this.idWrapCounter) * FileTransferProtocol.MAX_ID;
-
-//		System.out.println("max: " + FileTransferProtocol.MAX_ID); // TODO debug
-//		System.out.println("recvd: " + receivedId); // TODO debug
-//		System.out.println("LFR: " + receivedId); // TODO debug
 		
 		if (!(this.LFR > previousWraparoundRangeID)) { 
 			// check if packet from previous wraparound is already received (= expected earlier)
 			unwrappedId = previousWraparoundRangeID;
-		} else {//if (this.currentPacketToSend > currentWraparoundId) {
-			// TODO no way to know is packet was already sent?!! TODO check with Djurre
+		} else {
 			unwrappedId = currentWraparoundRangeID;
-//		} else {
-//			this.showNamedError("Something weird happend while wrapping around packet IDs");
-//			this.shutdown();
 		}
-//		System.out.println(unwrappedId); // TODO debug
-		
-		//return unwrappedId - this.startID; // TODO ????
-		return unwrappedId - this.startID; // TODO will not return negative, als currentWraparound add correspondings mutiple of MAX_ID
-
+		return unwrappedId - this.startID; 
 	}
-	
 	
 }
