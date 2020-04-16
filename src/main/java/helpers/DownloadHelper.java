@@ -250,7 +250,7 @@ public class DownloadHelper implements Helper, Runnable, util.ITimeoutEventHandl
 
 		if (initiate) { // running on a client: show progress bar
 			try (ProgressBar pb = new ProgressBar("Test", this.totalFileSize, 1, 
-					System.out, ProgressBarStyle.COLORFUL_UNICODE_BLOCK, " Bytes", 1, true, null)) {
+					System.out, ProgressBarStyle.COLORFUL_UNICODE_BLOCK, " Bytes", 1, false, null)) {
 				pb.setExtraMessage("Downloading..."); 
 
 				while (!this.complete) { 
