@@ -51,7 +51,7 @@ jar {
 remotes {
     pi {
         role 'masterNode'
-        host = 'nu-pi-huub.home' // note .home search domain (network pref>advanced>dns). When connected to wifi hotspot: '172.16.1.1'
+        host = 'nu-pi-huub.home' // <ENTER PI HOSTNAME OR IP-ADDRESS HERE!! When connected to wifi hotspot: '172.16.1.1'
         user = 'pi'
         password = 'raspberry'
     }
