@@ -54,11 +54,22 @@ task clientJar(type: Jar) {
     // allows Gradle to infer task dependencies automatically
     from sourceSets.main.output 
 
-    baseName = 'client'
+    baseName = 'FileTransferClient'
+}
+
+// need to configure this one from scratch
+task serverJar(type: Jar) {
+    // referring to the output in this way
+    // allows Gradle to infer task dependencies automatically
+    from sourceSets.main.output 
+
+    baseName = 'FileTransferServer'
 }
 
 // one way to make `gradle build` run both Jar tasks
 assemble.dependsOn(clientJar)
+assemble.dependsOn(serverJar)
+
 
 remotes {
     pi {
