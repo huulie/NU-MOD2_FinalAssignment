@@ -119,6 +119,7 @@ public class FileTransferServer implements Runnable {
 				// If setup() throws an ExitProgram exception, stop the program.
 				if (!textUI.getBoolean("Do you want to retry setup?")) {
 					this.shutdown(); 
+					break;
 				}
 			}
 		}
@@ -139,22 +140,29 @@ public class FileTransferServer implements Runnable {
 		boolean succesSocket = this.setupSocket();
 		boolean succesNetwork = this.setupOwnAddress();
 		
-		this.setupTimeoutThread();
-		
 		success = successFileSystem && succesSocket && succesNetwork;
 		
 		if (success) {
 			this.showNamedMessage("Setup complete!");
+		} else {
+			this.showNamedError("Setup FAILED!");
+			if (!textUI.getBoolean("Do you want to try again?")) {
+				throw new exceptions.ExitProgram("User indicated to exit the "
+						+ "program after setup failure.");
+			}
 		}
-		
+
+		this.setupTimeoutThread();
+
 		return success;
 	}
 	
 	/**
 	 * Sets up the file system.
 	 * @return boolean indicating if succeeded
+	 * @throws ExitProgram 
 	 */
-	public boolean setupFileSystem() {
+	public boolean setupFileSystem() throws ExitProgram {
 		boolean success = false;
 		this.root = Paths.get("").toAbsolutePath();
 		this.showNamedMessage("Server root path set to: " + this.root.toString());
@@ -169,10 +177,13 @@ public class FileTransferServer implements Runnable {
 		} catch (java.nio.file.FileAlreadyExistsException eExist) {
 			this.showNamedMessage("File storage directory already exist: not doing anything with "
 					+ fileStorageDirName + " in server root");
-			return success;
 		} catch (IOException e) {
 			this.showNamedError("Failed to create file storage because: " 
 					+ e.getLocalizedMessage());
+			if (!textUI.getBoolean("Do you want to try again?")) {
+				throw new exceptions.ExitProgram("User indicated to exit the "
+						+ "program after file system failure.");
+			}
 			return success;
 		}
 
@@ -216,8 +227,9 @@ public class FileTransferServer implements Runnable {
 	/**
 	 * Sets up the server network information.
 	 * @return boolean indicating if succeeded
+	 * @throws ExitProgram 
 	 */
-	public boolean setupOwnAddress() {
+	public boolean setupOwnAddress() throws ExitProgram {
 		boolean success = false;
 		try {
 			this.ownAddress = NetworkLayer.getOwnAddress(); // TODO replace by discover?
@@ -231,6 +243,10 @@ public class FileTransferServer implements Runnable {
 			success = true;
 		} catch (UnknownHostException e) {
 			this.showNamedMessage("Could not determine own address: " + e.getLocalizedMessage());
+			if (!textUI.getBoolean("Do you want to try again?")) {
+				throw new exceptions.ExitProgram("User indicated to exit the "
+						+ "program after network info failure.");
+			}
 		} 
 		
 		return success;

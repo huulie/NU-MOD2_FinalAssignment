@@ -58,7 +58,7 @@ public class DownloadHelper implements Helper, Runnable, util.ITimeoutEventHandl
 	/**
 	 * Total file size to download.
 	 */
-	private int totalFileSize;
+	private long totalFileSize;
 	
 	/**
 	 * Number of packets to receive in total.
@@ -175,7 +175,7 @@ public class DownloadHelper implements Helper, Runnable, util.ITimeoutEventHandl
 	 */
 	public DownloadHelper(Object parent, DatagramSocket downloadSocket,
 			InetAddress uploaderAddress, int uploaderPort,
-			int totalFileSize, File fileToWrite, int startID) {
+			long totalFileSize, File fileToWrite, int startID) {
 		this.parent = parent;
 		this.downloadSocket = downloadSocket;
 		this.uploaderAddress = uploaderAddress;
@@ -369,7 +369,9 @@ public class DownloadHelper implements Helper, Runnable, util.ITimeoutEventHandl
 		int packetID = nrToId(nrToAck);
 		
 		this.sendBytesToUploader(packetID, FileTransferProtocol.ACK, false);
+		if (!initiate) { // running on server: more textual output
 		this.showNamedMessage("Packet " + nrToAck + " with ID = " + packetID + " ACK send");
+		}
 		
 		// check if ID could wrap around in the new receive window:
 		int maxIdToReceived = nrToId(nrToAck + RWS); 
@@ -534,7 +536,7 @@ public class DownloadHelper implements Helper, Runnable, util.ITimeoutEventHandl
 		this.uploaderPort = uploaderPort;
 	}
 	
-	public void setTotalFileSize(int totalFileSize) {
+	public void setTotalFileSize(long totalFileSize) {
 		this.totalFileSize = totalFileSize;
 	}
 	

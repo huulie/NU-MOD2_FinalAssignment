@@ -212,7 +212,7 @@ public class FileTransferClientHandler implements Runnable {
 						int uploaderPort = Integer.parseInt(request[1]);
 						this.showNamedMessage("From uploader on port: " + uploaderPort);
 
-						int totalFileSize = Integer.parseInt(request[2]);
+						long totalFileSize = Long.parseLong(request[2]);
 						this.showNamedMessage("Uploader reports total file size = " 
 								+ totalFileSize + " bytes");
 						
@@ -352,7 +352,7 @@ public class FileTransferClientHandler implements Runnable {
 	 * @throws ServerFailureException
 	 * @throws NotEnoughFreeSpaceException
 	 */
-	public void uploadSingle(File fileToDownload, int uploaderPort, int totalFileSize, int startID) 
+	public void uploadSingle(File fileToDownload, int uploaderPort, long totalFileSize, int startID) 
 			throws ServerFailureException, NotEnoughFreeSpaceException {
 		
 		if (this.checkFreeSpace(totalFileSize)) {
@@ -437,8 +437,8 @@ public class FileTransferClientHandler implements Runnable {
 	 * @return true if there more than totalFileSize free space
 	 * @throws NotEnoughFreeSpaceException
 	 */
-	public boolean checkFreeSpace(int totalFileSize) throws NotEnoughFreeSpaceException {
-		int freeSpace = (int) this.fileStorage.toFile().getUsableSpace(); // TODO casting long->int!
+	public boolean checkFreeSpace(long totalFileSize) throws NotEnoughFreeSpaceException {
+		long freeSpace = this.fileStorage.toFile().getUsableSpace(); 
 		if (freeSpace > totalFileSize) {
 			this.showNamedMessage("Free space remaining after upload: " 
 					+ (freeSpace - totalFileSize) + " bytes");

@@ -78,7 +78,7 @@ public class FileTransferProtocol {
 	 * 
 	 * When send by server: Respond to client sending UPLOAD.
 	 * 	Arguments (separated by delimiter): 
-	 * 		int portOfUploader; int totalFileSize (in bytes); int startID
+	 * 		int portOfUploader; long totalFileSize (in bytes); int startID
 	 * 	Bytes: File[] fileToDownload (to client)
 	 */
 	public static final String DOWNLOAD = "DOWNLOAD";
@@ -86,7 +86,7 @@ public class FileTransferProtocol {
 	/**
 	 * When send by client: request upload of file to server.
 	 * 	Arguments (separated by delimiter): 
-	 * 		int portOfUploader; int totalFileSize (in bytes); int startID
+	 * 		int portOfUploader; long totalFileSize (in bytes); int startID
 	 * 	Bytes: File[] fileToUpload 
 	 * 
 	 * When send by server: Respond to client sending DOWNLOAD.

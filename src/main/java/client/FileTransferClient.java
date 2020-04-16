@@ -591,7 +591,7 @@ public class FileTransferClient {
 				this.showNamedMessage("Uploader is on server port = " 
 						+ Integer.parseInt(responseSplit[1])); 
 
-				int totalFileSize = Integer.parseInt(responseSplit[2]);
+				long totalFileSize = Long.parseLong(responseSplit[2]);
 				this.showNamedMessage("Uploader reports total file size = " 
 						+ totalFileSize + " bytes");
 				
@@ -599,6 +599,7 @@ public class FileTransferClient {
 					this.downloads.remove(downloadHelper);
 					return false;
 				}
+				downloadHelper.setTotalFileSize(totalFileSize);
 				
 				int startID = Integer.parseInt(responseSplit[3]);
 				this.showNamedMessage("Uploader starts at ID = " + startID);
@@ -863,6 +864,8 @@ public class FileTransferClient {
 	public File selectLocalFile() {
 		File[] localFiles = this.getLocalFiles();
 		
+		this.showNamedMessage(Arrays.toString(localFiles));
+		
 		int selectedIndex = -1;
 		while (!(selectedIndex >= 0 && selectedIndex < localFiles.length)) {
 			selectedIndex = textUI.getInt("Which index to select?"); 
@@ -942,9 +945,9 @@ public class FileTransferClient {
 	 * @return true if there more than totalFileSize free space
 	 * @throws NotEnoughFreeSpaceException
 	 */
-	public boolean checkFreeSpace(int totalFileSize) throws NotEnoughFreeSpaceException {
-		int freeSpace = (int) this.fileStorage.toFile().getUsableSpace(); // TODO casting long->int!
-		if (freeSpace > totalFileSize) {
+	public boolean checkFreeSpace(long totalFileSize) throws NotEnoughFreeSpaceException {
+		long freeSpace = this.fileStorage.toFile().getUsableSpace(); 
+		if (freeSpace > totalFileSize) { 
 			this.showNamedMessage("Free space remaining after upload: " 
 					+ (freeSpace - totalFileSize) + " bytes");
 			return true;

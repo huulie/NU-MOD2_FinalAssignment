@@ -139,18 +139,18 @@ public class TUI  {
 	 */
 	public void printHelpMenu() {
 		this.showMessage("Commands:");
-		this.showMessage(TUICommands.START_SESSION + " = start a session with the server");
-		this.showMessage(TUICommands.LIST_FILES + " = list files on the server");
-		this.showMessage(TUICommands.LIST_FILES_LOCAL + " = list files on this client");
-		this.showMessage(TUICommands.DOWNLOAD_SINGLE + " = download a single file from the server");
-		this.showMessage(TUICommands.UPLOAD_SINGLE + " = upload a single file to the server");
-		this.showMessage(TUICommands.DELETE_SINGLE + " = delete a single file from the server");
-		this.showMessage(TUICommands.CHECK_INTEGRITY + " = check integrity of single file"
+		this.showMessage("- " + TUICommands.START_SESSION + " = start a session with the server");
+		this.showMessage("- " + TUICommands.LIST_FILES + " = list files on the server");
+		this.showMessage("- " + TUICommands.LIST_FILES_LOCAL + " = list files on this client");
+		this.showMessage("- " + TUICommands.DOWNLOAD_SINGLE + " = download a single file from the server");
+		this.showMessage("- " + TUICommands.UPLOAD_SINGLE + " = upload a single file to the server");
+		this.showMessage("- " + TUICommands.DELETE_SINGLE + " = delete a single file from the server");
+		this.showMessage("- " + TUICommands.CHECK_INTEGRITY + " = check integrity of single file"
 				+ " against the server");
-		this.showMessage(TUICommands.DOWNLOAD_MANAGER + " = manage downloaders");
-		this.showMessage(TUICommands.UPLOAD_MANAGER + " = manage uploaders");
-		this.showMessage(TUICommands.HELP + " = help (this menu)");
-		this.showMessage(TUICommands.EXIT + " = exit client");
+		this.showMessage("- " + TUICommands.DOWNLOAD_MANAGER + " = manage downloaders");
+		this.showMessage("- " + TUICommands.UPLOAD_MANAGER + " = manage uploaders");
+		this.showMessage("- " + TUICommands.HELP + " = help (this menu)");
+		this.showMessage("- " + TUICommands.EXIT + " = exit client");
 	}
 	
 }

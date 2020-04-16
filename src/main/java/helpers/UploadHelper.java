@@ -57,7 +57,7 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 	/**
 	 * Total file size to upload.
 	 */
-	private int totalFileSize;
+	private long totalFileSize;
 
 	/**
 	 * File object to read and upload.
@@ -170,7 +170,7 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 	 * @param fileToRead to read and upload
 	 */
 	public UploadHelper(Object parent, DatagramSocket uploadSocket, InetAddress downloaderAddress,
-			int downloaderPort, int totalFileSize, File fileToRead) {
+			int downloaderPort, long totalFileSize, File fileToRead) {
 		this.parent = parent;
 		this.uploadSocket = uploadSocket;
 		this.downloaderAddress = downloaderAddress;
@@ -345,8 +345,9 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 			while (!ackReceived) {
 				Packet receivedPacket = TransportLayer.receivePacket(this.uploadSocket);
 				
-				if (receivedPacket != null) {
+				if (receivedPacket == null) {
 					this.showNamedError("NULL packet received");
+					continue;
 				} else if (!this.checkSource(receivedPacket)) {
 					continue;
 				}
