@@ -20,6 +20,7 @@ public class FileTransferProtocol {
 	
 	/**
 	 * Maximal size of a Packet (data for the DatagramPacket), consisting of header and payload.
+	 * Note: as imposed by the underlying UDP/Ipv4 protocols, this xould be maximal 65507 bytes.
 	 */
 	public static final int MAX_PACKET_SIZE = 1024;
 
