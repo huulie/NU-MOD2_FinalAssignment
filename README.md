@@ -5,11 +5,14 @@ Final assignment of Nedap University module 2
 This repository contains a FileTransfer server (_to run locally on a laptop or remote on a Raspberry Pi_) and a FileTransfer client (_to run locally on laptop_). 
 
 ## Installation instruction
+Take care: this program  __only works if you have Java 11 installed__. Please install Java 11 if necessary.
+
+_An "Unable to access jarfile" error may be solved by placing the file in another folder_
 
 ### FileTranser server 
 #### locally
 - download the FileTransferServer-1.0.0.jar and all other files with server in their names (see _releases_)
-- start the server by excuting server (or on windows: server.bat)
+- start the server by navigating to the folder containing the FileTransferServer-1.0.0.jar. Then type: `java -jar FileTransferServer-1.0.0.jar` and answer the questions in the terminal.
 
 #### on a Raspbarry Pi
 - install the Pi according to these instructions: https://github.com/nedap/nu-module-2/blob/master/pi_setup/setup.md
@@ -19,4 +22,4 @@ This repository contains a FileTransfer server (_to run locally on a laptop or r
 
 ## FileTransfer client
 - download the FileTransferClient-1.0.0.jar and all other files with client in their names (see _releases_)
-- start the server by excuting client (or on windows: client.bat)
+- start the server by navigating to the folder containing the FileTransferClient-1.0.0.jar. Then type: `java -jar FileTransferClient-1.0.0.jar` and answer the questions in the terminal.
