@@ -38,7 +38,7 @@ ssh.settings {
 }
 
 mainClassName = 'server.FileTransferServer'
-version = '0.0.1'
+version = '1.0.0'
 
 jar {
     manifest {
@@ -47,6 +47,18 @@ jar {
                 'Main-Class': mainClassName
     }
 }
+
+// need to configure this one from scratch
+task clientJar(type: Jar) {
+    // referring to the output in this way
+    // allows Gradle to infer task dependencies automatically
+    from sourceSets.main.output 
+
+    baseName = 'client'
+}
+
+// one way to make `gradle build` run both Jar tasks
+assemble.dependsOn(clientJar)
 
 remotes {
     pi {
