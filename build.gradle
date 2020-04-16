@@ -30,6 +30,15 @@ repositories { // scope also outside buildscript
 
 dependencies {
     compile 'me.tongfei:progressbar:0.8.1'
+    testCompile('org.junit.jupiter:junit-jupiter:5.4.2')
+    testImplementation('org.junit.jupiter:junit-jupiter:5.4.2')
+}
+
+test {
+  useJUnitPlatform()
+  testLogging {
+    events "passed", "skipped", "failed"
+  }
 }
 
 // Global settings
