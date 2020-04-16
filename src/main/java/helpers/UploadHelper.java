@@ -338,8 +338,10 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 	 */
 	public void listenForAck() {
 		try {
-			this.showNamedMessage("Listening for ACK(s)...");
-
+			if (!this.paused) {
+				this.showNamedMessage("Listening for ACK(s)...");
+			}
+			
 			boolean ackReceived = false;
 
 			while (!ackReceived) {
@@ -369,7 +371,7 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 				}
 			}
 		} catch (SocketTimeoutException e) {
-			this.showNamedMessage("Socket timed-out: retry receive");
+			// this.showNamedMessage("Socket timed-out: retry receive"); // for debugging
 			this.listenForAck();
 		} catch (IOException | PacketException | UtilDatagramException e) {
 			this.showNamedError("Receiving packet failed: " + e.getLocalizedMessage());

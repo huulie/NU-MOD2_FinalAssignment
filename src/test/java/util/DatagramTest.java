@@ -41,7 +41,6 @@ public class DatagramTest {
 			int testId = util.Datagram.getHeaderId(testDatagram.getData());
 			assertTrue(testId == mockId);
 
-			
 			int testByteOffset = util.Datagram.getHeaderByteOffset(testDatagram.getData());
 			assertTrue(testByteOffset == mockByteOffset);
 
