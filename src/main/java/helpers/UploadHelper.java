@@ -296,6 +296,8 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 	 * Transfer the byte[] of the File to the downloader, contained in Packets.
 	 */
 	public void transferBytes() {
+		// TODO when running on client, also here use a progress bar (first solve repeating issue)
+		
 		while (!(filePointer >= fileContents.length && totalAckPackets == totalPackets)) { 
 			// while not (reached end of the file AND all packets are acknowledged)
 
@@ -328,8 +330,10 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 		filePointer += Math.min(FileTransferProtocol.MAX_PAYLOAD_LENGTH,
 				fileContents.length - filePointer); 
 		
-		this.showNamedMessage("Packet " + currentPacketToSend 
-				+ " with ID = " + packetID + " send..");
+		if (waitForInitiate) { // running on server: more textual output
+			this.showNamedMessage("Packet " + currentPacketToSend 
+					+ " with ID = " + packetID + " send..");
+		}
 		currentPacketToSend++;
 	}
 	
@@ -339,7 +343,9 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 	public void listenForAck() {
 		try {
 			if (!this.paused) {
-				this.showNamedMessage("Listening for ACK(s)...");
+				if (waitForInitiate) { // running on server: more textual output
+					this.showNamedMessage("Listening for ACK(s)...");
+				}
 			}
 			
 			boolean ackReceived = false;
@@ -403,16 +409,25 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 		if (p.getId() == nrToId(nrToAck)) { // check if no shift in list
 			if (!p.isAck()) {
 				p.setAck(true);
-				this.showNamedMessage("Packet " + nrToAck + " ACKed!");
+				
+				if (waitForInitiate) { // running on server: more textual output
+					this.showNamedMessage("Packet " + nrToAck + " ACKed!");
+				}
+				
 				totalAckPackets++;
 			} else {
-				this.showNamedMessage("Packet " + nrToAck + " was already ACKed: duplicate!");
+				
+				if (waitForInitiate) { // running on server: more textual output
+					this.showNamedMessage("Packet " + nrToAck + " was already ACKed: duplicate!");
+				}
 			}
 			found = true;
 		}
 
 		if (!found) {
-			this.showNamedError("Packet with number " + nrToAck + " not found!");
+			if (waitForInitiate) { // running on server: more textual output
+				this.showNamedError("Packet with number " + nrToAck + " not found!");
+			}
 		}
 	}
 
@@ -471,8 +486,10 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 	public void timeoutElapsed(Object tag) {
 		Packet packet = (Packet) tag;
 		if (!packet.isAck()) {
-			this.showNamedMessage("TIME OUT packet with ID = " 
-					+ packet.getId() + " without ACK: resend!");
+			if (waitForInitiate) { // running on server: more textual output
+				this.showNamedMessage("TIME OUT packet with ID = " 
+						+ packet.getId() + " without ACK: resend!");
+			}
 			sendPacketToDownloader(packet);
 			
 			this.restrictResend(packet);
@@ -560,6 +577,14 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 	
 	public boolean isPaused() {
 		return this.paused;
+	}
+	
+	/**
+	 * Check if helper has closed its socket (= shutdown).
+	 * @return true if socket is closed
+	 */
+	public boolean isSocketClosed() {
+		return this.uploadSocket.isClosed();
 	}
 	
 	/**

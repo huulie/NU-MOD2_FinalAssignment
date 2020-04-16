@@ -23,4 +23,10 @@ public interface Helper {
 	 */
 	public void resume(); // interface method (does not have a body)
 	
+	/**
+	 * Check if helper has closed its socket (= shutdown).
+	 * @return true if socket is closed
+	 */
+	public boolean isSocketClosed(); // interface method (does not have a body)
+	
 }

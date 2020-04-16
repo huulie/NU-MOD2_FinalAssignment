@@ -62,6 +62,12 @@ task clientJar(type: Jar) {
     // referring to the output in this way
     // allows Gradle to infer task dependencies automatically
     from sourceSets.main.output 
+    
+    manifest {
+        attributes 'Implementation-Title': 'Nedap University Module 2 Final Project',
+                'Implementation-Version': version,
+                'Main-Class': 'client.FileTransferClient'
+    }
 
     baseName = 'FileTransferClient'
 }
@@ -71,6 +77,12 @@ task serverJar(type: Jar) {
     // referring to the output in this way
     // allows Gradle to infer task dependencies automatically
     from sourceSets.main.output 
+
+    manifest {
+        attributes 'Implementation-Title': 'Nedap University Module 2 Final Project',
+                'Implementation-Version': version,
+                'Main-Class': 'server.FileTransferServer'
+    }    
 
     baseName = 'FileTransferServer'
 }

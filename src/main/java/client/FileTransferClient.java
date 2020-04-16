@@ -413,7 +413,7 @@ public class FileTransferClient {
 					
 				case TUICommands.LIST_FILES_LOCAL: 
 					this.showNamedMessage("Making list of local files...");
-					this.showNamedMessage(Arrays.toString(this.getLocalFiles()));  
+					this.printArrayOfFile(this.getLocalFiles());  
 					break;
 
 				case TUICommands.DOWNLOAD_SINGLE:
@@ -541,7 +541,7 @@ public class FileTransferClient {
 			this.showNamedMessage("Server response received, now processing..."); 
 			fileArray = util.Bytes.deserialiseByteArrayToFileArray(responseBytes);
 			this.serverFiles = fileArray;
-			this.showNamedMessage("LIST OF FILES: \n" + Arrays.toString(fileArray));
+			this.printArrayOfFile(fileArray);
 			
 			success = true;
 
@@ -819,7 +819,7 @@ public class FileTransferClient {
 	public boolean helperManager(List<Helper> listOfHelpers) { 
 		boolean success = false;
 
-		this.showNamedMessage("Found helpers: \n" + Arrays.toString(listOfHelpers.toArray()));
+		this.printListOfHelpers(listOfHelpers);
 
 		int selectedIndex = -1;
 		while (!(selectedIndex >= 0 && selectedIndex < listOfHelpers.size())) {
@@ -828,7 +828,9 @@ public class FileTransferClient {
 
 		Helper selectedHelper = listOfHelpers.get(selectedIndex);
 
-		if (selectedHelper.isPaused()) {
+		if (selectedHelper.isSocketClosed()) {
+			this.showNamedMessage("This helper has already shutdown (and closed it socket)");
+		} else if (selectedHelper.isPaused()) {
 			if (textUI.getBoolean("Would you like to resume this helper?")) {
 				selectedHelper.resume();
 			}
@@ -864,7 +866,7 @@ public class FileTransferClient {
 	public File selectLocalFile() {
 		File[] localFiles = this.getLocalFiles();
 		
-		this.showNamedMessage(Arrays.toString(localFiles));
+		this.printArrayOfFile(localFiles);
 		
 		int selectedIndex = -1;
 		while (!(selectedIndex >= 0 && selectedIndex < localFiles.length)) {
@@ -927,8 +929,8 @@ public class FileTransferClient {
 			fileOnServer = matchesOnServer.get(0);
 			this.showNamedMessage("One matching file found: " + fileOnServer);
 		} else { // more matching
-			this.showNamedMessage("Found matches: \n" 
-					+ Arrays.toString(matchesOnServer.toArray()));
+			this.showNamedMessage("Found matches:"); 
+			this.printListOfFile(matchesOnServer);
 
 			int selectedIndex = -1;
 			while (!(selectedIndex >= 0 && selectedIndex < this.serverFiles.length)) {
@@ -1096,6 +1098,36 @@ public class FileTransferClient {
 	 */
 	public void showNamedError(String message) {
 		textUI.showNamedError(this.name, message);
+	}
+	
+	/** 
+	 * Print array in a nice layout.
+	 */
+	public void printArrayOfFile(File[] arrayToPrint) {
+		this.showNamedMessage("List of files:");
+		for (int i = 0; i < arrayToPrint.length; i++) {
+			this.showNamedMessage("[" + i + "]: " + arrayToPrint[i]);
+		}
+	}
+	
+	/** 
+	 * Print list in a nice layout.
+	 */
+	public void printListOfFile(List<File> listToPrint) {
+		this.showNamedMessage("List of files:");
+		for (int i = 0; i < listToPrint.size(); i++) {
+			this.showNamedMessage("[" + i + "]: " + listToPrint.get(i));
+		}
+	}
+	
+	/** 
+	 * Print list in a nice layout.
+	 */
+	public void printListOfHelpers(List<Helper> listToPrint) {
+		this.showNamedMessage("List of helpers:");
+		for (int i = 0; i < listToPrint.size(); i++) {
+			this.showNamedMessage("[" + i + "]: " + listToPrint.get(i));
+		}
 	}
 	
 	// ------------------ Main --------------------------

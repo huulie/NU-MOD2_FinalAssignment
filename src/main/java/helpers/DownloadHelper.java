@@ -588,6 +588,14 @@ public class DownloadHelper implements Helper, Runnable, util.ITimeoutEventHandl
 	}
 	
 	/**
+	 * Check if helper has closed its socket (= shutdown).
+	 * @return true if socket is closed
+	 */
+	public boolean isSocketClosed() {
+		return this.downloadSocket.isClosed();
+	}
+	
+	/**
 	 * Show statistic of this downloader.
 	 */
 	public void showStats() {
