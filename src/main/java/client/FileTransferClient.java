@@ -172,11 +172,12 @@ public class FileTransferClient {
 
 		boolean successFileSystem = this.setupFileSystem();
 		boolean succesSocket = this.setupSocket();
-		this.setupOwnAddress();
+		boolean succesNetwork = this.setupOwnAddress();
 		boolean succesServer = this.setServer();
 		boolean succesSession = this.setupStartSession();
 
-		success = successFileSystem && succesSocket && succesServer && succesSession;
+		success = successFileSystem && succesSocket && succesNetwork 
+				&& succesServer && succesSession;
 		
 		if (success) {
 			this.showNamedMessage("Setup complete!");
@@ -242,7 +243,8 @@ public class FileTransferClient {
 	 * Sets up the client network information.
 	 * @return boolean indicating if succeeded
 	 */
-	public void setupOwnAddress() {
+	public boolean setupOwnAddress() {
+		boolean success = false;
 		try {
 			this.ownAddress = NetworkLayer.getOwnAddress(); // TODO replace by discover?
 			this.showNamedMessage("Client listing on: " + this.ownAddress);
@@ -250,9 +252,11 @@ public class FileTransferClient {
 					+ " this may NOT be the actual interface used");
 			this.showNamedMessage("Discovered preferred local address: " 
 					+ NetworkLayer.discoverLocalAddress());
+			success = true;
 		} catch (UnknownHostException e) {
 			this.showNamedMessage("Could not determine own address: " + e.getLocalizedMessage());
 		} 
+		return success;
 	}
 	
 	/**
@@ -463,10 +467,10 @@ public class FileTransferClient {
 				default:
 					this.showNamedError("Unknow command received (and ignoring it)"); 
 			}
+			this.showNamedMessage("... done!");
 		} catch (IOException | PacketException | UtilDatagramException e) {
 			this.showNamedError("Something went wrong: " + e.getLocalizedMessage());
 		}
-		this.showNamedMessage("... done!");
 	}
 	
 	/**
@@ -591,15 +595,9 @@ public class FileTransferClient {
 				this.showNamedMessage("Uploader reports total file size = " 
 						+ totalFileSize + " bytes");
 				
-				long freeSpace = this.fileStorage.toFile().getUsableSpace(); 
-				if (freeSpace > totalFileSize) { // TODO comparing long to int! 
-					downloadHelper.setTotalFileSize(totalFileSize); 
-					this.showNamedMessage("Free space remaining after download: " 
-							+ (freeSpace - totalFileSize) + " bytes");
-				} else {
-					this.downloads.remove(downloadHelper); 
-					throw new NotEnoughFreeSpaceException(totalFileSize 
-							+ "bytes don't fit in " + freeSpace + "bytes of free space");
+				if (!this.checkFreeSpace(totalFileSize)) {
+					this.downloads.remove(downloadHelper);
+					return false;
 				}
 				
 				int startID = Integer.parseInt(responseSplit[3]);
@@ -629,7 +627,7 @@ public class FileTransferClient {
 	}
 	
 	/**
-	 Request upload of a single file to the server,
+	 * Request upload of a single file to the server,
 	 * and start a uploadHelper to send it.
 	 * @param File fileToUpload (NOTE: file as on client!)
 	 * @return boolean indicating if succeeded
@@ -939,6 +937,24 @@ public class FileTransferClient {
 	}
 	
 	/**
+	 * Check if there is enough space to store the file.
+	 * @param totalFileSize of the file
+	 * @return true if there more than totalFileSize free space
+	 * @throws NotEnoughFreeSpaceException
+	 */
+	public boolean checkFreeSpace(int totalFileSize) throws NotEnoughFreeSpaceException {
+		int freeSpace = (int) this.fileStorage.toFile().getUsableSpace(); // TODO casting long->int!
+		if (freeSpace > totalFileSize) {
+			this.showNamedMessage("Free space remaining after upload: " 
+					+ (freeSpace - totalFileSize) + " bytes");
+			return true;
+		} else {
+			throw new NotEnoughFreeSpaceException(totalFileSize 
+					+ "bytes don't fit in " + freeSpace + "bytes of free space");
+		}
+	}
+	
+	/**
 	 * Make a request to the server, and receive response.
 	 * @param requestString part of the request
 	 * @param requestBytes part of the request
@@ -983,9 +999,9 @@ public class FileTransferClient {
 	}
 	
 	/**
-	 * Send bytes to the server, contained a Packet.
+	 * Send bytes to the server, contained in a Packet.
 	 * @param bytesToSend to server
-	 * @param byteOffset due to string part
+	 * @param byteOffset due to String part
 	 */
 	public void sendBytesToServer(byte[] bytesToSend, int byteOffset) {
 		try { // to construct and send a packet
@@ -1004,7 +1020,7 @@ public class FileTransferClient {
 					this.serverPort
 			); 
 			
-			this.showNamedMessage("Bytes send to server!");
+			// this.showNamedMessage("Bytes send to server!"); // for debugging
 			
 		} catch (PacketException | IOException | UtilByteException | UtilDatagramException e) {
 			this.showNamedError("Something went wrong while sending bytes: "
@@ -1082,7 +1098,7 @@ public class FileTransferClient {
 	// ------------------ Main --------------------------
 
 	/**
-	 * Use this main method to boot a client.
+	 * Use this main method to boot a new FileTransfer client.
 	 * @param args
 	 */
 	public static void main(String[] args) {

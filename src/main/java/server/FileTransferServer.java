@@ -15,6 +15,7 @@ import java.util.List;
 
 import exceptions.ExitProgram;
 import exceptions.PacketException;
+import exceptions.ServerFailureException;
 import exceptions.UtilByteException;
 import exceptions.UtilDatagramException;
 import network.NetworkLayer;
@@ -22,78 +23,92 @@ import network.Packet;
 import network.TransportLayer;
 import protocol.FileTransferProtocol;
 
+/**
+ * Server to interact with FileTransfer clients, and start new clientHandlers.
+ * @author huub.lievestro
+ *
+ */
 public class FileTransferServer implements Runnable { 
 
-	/** The socket of this FileTranferServer. */
+	/** 
+	 * The socket of this FileTranferServer.
+	 */
 	private DatagramSocket socket;
 
-	/** List of FileTransferClientHandler, one for each connected client. */
+	/** 
+	 * List of FileTransferClientHandlers, one for each connected client. 
+	 */
 	private List<FileTransferClientHandler> clients;
 
-	/** List of GoClientHandlers, waiting to be connected to a port. */
-	// TODO: implement with max_concurrent_clients?
-	private List<FileTransferClientHandler> clientsWaitingList;
+	/** 
+	 * Next client number, increasing for every new connection. 
+	 */
+	private int nextClientNr;
 
-	/** Next client number, increasing for every new connection. */
-	private int next_client_no;
+	/** 
+	 * The TUI of this FileTransferServer. 
+	 */
+	private userInterface.TUI textUI; 
 
-	/** The TUI of this FileTransferServer. */
-	private userInterface.TUI TUI; 
-
-	/** Network info for server. */
+	/** 
+	 * Network address of the server. 
+	 */
 	InetAddress ownAddress = null;
+	
+	/** 
+	 * Network port of the server. 
+	 */
 	int ownPort = 0;
 	
 	/*
-	 * TODO
+	 * Name of the server
 	 */
 	private String name;
 	
-	/**
-	 * TODO
+	/** 
+	 * Local filesystem root.
 	 */
 	Path root;
+	
+	/**
+	 * Local filesystem storage location of this server.
+	 */
 	Path fileStorage;
+	
+	/**
+	 * Name of the local storage location of this server.
+	 */
 	String fileStorageDirName;
 
 	/**
-	 * TODO restrict access of client to only their own storage
+	 * Sandboxing = estrict access of client to only their own storage.
 	 */
 	boolean sandboxClients;
 	
 	/**
-	 * Map of <String clientName, Path sandboxPath>. 
+	 * Map of sandbox storages: <String clientName, Path sandboxPath>. 
 	 */
-	HashMap<String,Path> sandboxStorages;
+	HashMap<String, Path> sandboxStorages;
 	
 	/**
-	 * Name which will give acces to server file storage
+	 * Name which will give access to server file storage.
 	 */
 	String adminName;
-	
-	// TODO: same as example, because interrupt thread? 	
-	boolean running;
 
 	/**
 	 * Construct a new FileTransfer server.
-	 * @param socket
-	 * @param port
+	 * @param port to bind socket to
 	 */
 	public FileTransferServer(int port) {
-		// Initialise instance variables:
 		this.ownPort = port;
-		this.running = true;
-
+	
 		this.clients = new ArrayList<>();
-		this.next_client_no = 1;
-		this.clientsWaitingList = new ArrayList<>();
+		this.nextClientNr = 1;
 
-		this.TUI = new userInterface.TUI();
-		name = "FTServer"; // TODO fixed name, fallback if setup doesn't set it
+		this.textUI = new userInterface.TUI();
+		name = "FTServer"; // fallback if setup doesn't set it
 		
 		this.fileStorageDirName = "FTSstorage";
-		
-		
 
 		// Do setup
 		boolean setupSucces = false;
@@ -102,35 +117,31 @@ public class FileTransferServer implements Runnable {
 				setupSucces = this.setup();
 			} catch (exceptions.ExitProgram eExit) {
 				// If setup() throws an ExitProgram exception, stop the program.
-				if (!TUI.getBoolean("Do you want to retry setup?")) {
-					setupSucces = false;
+				if (!textUI.getBoolean("Do you want to retry setup?")) {
+					this.shutdown(); 
 				}
 			}
 		}
 	}
 	
+	
 	// ------------------ Server Setup --------------------------
 	/**
-	 * Sets up a new FileTransferServer TODO
-	 * 
-	 * @throws ExitProgram if a connection can not be created on the given 
-	 *                     port and the user decides to exit the program.
-	 * @ensures a serverSocket is opened.
+	 * Sets up a new FileTransferServer.
+	 * @return boolean indicating if succeeded
+	 * @throws ExitProgram if the user decides to exit the program.
 	 */
 	public boolean setup() throws exceptions.ExitProgram {
 		this.showNamedMessage("Setting up the server...");
 		boolean success = false;
-		
-		// First, initialise the Server.
-		// SERVERNAME = TUI.getString("What is the name of this server?"); // TODO name? 
 
 		boolean successFileSystem = this.setupFileSystem();
 		boolean succesSocket = this.setupSocket();
-		this.setupOwnAddress();
+		boolean succesNetwork = this.setupOwnAddress();
 		
 		this.setupTimeoutThread();
 		
-		success = successFileSystem && succesSocket;
+		success = successFileSystem && succesSocket && succesNetwork;
 		
 		if (success) {
 			this.showNamedMessage("Setup complete!");
@@ -139,44 +150,51 @@ public class FileTransferServer implements Runnable {
 		return success;
 	}
 	
+	/**
+	 * Sets up the file system.
+	 * @return boolean indicating if succeeded
+	 */
 	public boolean setupFileSystem() {
 		boolean success = false;
-		this.root = Paths.get("").toAbsolutePath(); // TODO suitable method? https://www.baeldung.com/java-current-directory
+		this.root = Paths.get("").toAbsolutePath();
 		this.showNamedMessage("Server root path set to: " + this.root.toString());
 
 		this.fileStorage = root.resolve(fileStorageDirName);
 		this.showNamedMessage("File storage set to: " + this.fileStorage.toString());
 
-
-		//		if (!Files.exists(fileStorage)) { // TODO: use if or catch exception
 		try {
 			Files.createDirectory(fileStorage);
-			this.showNamedMessage("File storage directory did not exist: created " + fileStorageDirName + " in server root"); 
-		} catch(java.nio.file.FileAlreadyExistsException eExist) {
-			this.showNamedMessage("File storage directory already exist: not doing anything with " + fileStorageDirName + " in server root");
+			this.showNamedMessage("File storage directory did not exist:"
+					+ " created " + fileStorageDirName + " in server root"); 
+		} catch (java.nio.file.FileAlreadyExistsException eExist) {
+			this.showNamedMessage("File storage directory already exist: not doing anything with "
+					+ fileStorageDirName + " in server root");
+			return success;
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			this.showNamedError("Failed to create file storage: server CRASHED because " + e.getLocalizedMessage());
-			e.printStackTrace();
+			this.showNamedError("Failed to create file storage because: " 
+					+ e.getLocalizedMessage());
+			return success;
 		}
-		//        } else {
-		//	    	this.showNamedMessage("File storage directory already exist: not doing anything with " + fileStorageDirName + " in server root"); 
-		//        }
 
-		this.sandboxClients = true; // TODO input on pi returns nullpointer? this.TUI.getBoolean("Do you want to sandbox clients?");
+		this.sandboxClients = true; 
+		//PM: getting cmd input on pi returns nullpointers, 
+		//		could not use: this.TUI.getBoolean("Do you want to sandbox clients?");
 		this.adminName = "admin";
 		this.showNamedMessage("Admin is: " + this.adminName);
 		this.sandboxStorages = new HashMap<String, Path>(); 
 
-		success = true; // TODO significant?
+		success = true; 
 		return success;
 	}
 
+	/**
+	 * Sets up the socket.
+	 * @return boolean indicating if succeeded
+	 */
 	public boolean setupSocket() throws ExitProgram {
 		boolean success = false;
 		this.showNamedMessage("Trying to open a new socket...");
-		while (this.socket == null) { // TODO: ask for server port?
-			//port = TUI.getInt("Please enter the server port.");
+		while (this.socket == null) { 
 
 			try {
 				this.socket = TransportLayer.openNewDatagramSocket(this.ownPort);
@@ -185,7 +203,7 @@ public class FileTransferServer implements Runnable {
 			} catch (SocketException e) {
 				this.showNamedMessage("Something went wrong when opening the socket: "
 						+ e.getLocalizedMessage());
-				if (!TUI.getBoolean("Do you want to try again?")) {
+				if (!textUI.getBoolean("Do you want to try again?")) {
 					throw new exceptions.ExitProgram("User indicated to exit the "
 							+ "program after socket opening failure.");
 				}
@@ -195,31 +213,42 @@ public class FileTransferServer implements Runnable {
 		return success;
 	}
 	
-	public void setupOwnAddress() {
+	/**
+	 * Sets up the server network information.
+	 * @return boolean indicating if succeeded
+	 */
+	public boolean setupOwnAddress() {
+		boolean success = false;
 		try {
 			this.ownAddress = NetworkLayer.getOwnAddress(); // TODO replace by discover?
 			this.showNamedMessage("Server listing on: " + this.ownAddress);
-			this.showNamedMessage("NOTE: depending on detection method, this may NOT be the actual interface used");
+			this.showNamedMessage("NOTE: depending on detection method,"
+					+ " this may NOT be the actual interface used");
+			this.showNamedMessage("Discovered preferred local address: " 
+					+ NetworkLayer.discoverLocalAddress());
 			
 			this.name = this.ownAddress.getHostName();
+			success = true;
 		} catch (UnknownHostException e) {
 			this.showNamedMessage("Could not determine own address: " + e.getLocalizedMessage());
 		} 
+		
+		return success;
 	}
 	
+	/**
+	 * Start helper thread for time outs.
+	 */
 	public void setupTimeoutThread() {
 		util.TimeOut.start();
 		this.showNamedMessage("TimeOut helper started...");
 	}
 	
+	
 	// ------------------ Server Methods --------------------------
 	
 	/**
-	 * starts a new FileTransferHandler for every connecting client.
-	 * 
-	 * If {@link #setup()} throws a ExitProgram exception, stop the program. 
-	 * In case of any other errors, ask the user whether the setup should be 
-	 * ran again to open a new socket.
+	 * Starts a new FileTransferHandler for every connecting client.
 	 */
 	public void run() {
 		try {
@@ -228,94 +257,89 @@ public class FileTransferServer implements Runnable {
 
 				Packet receivedPacket = TransportLayer.receivePacket(this.socket);
 
-				System.out.println("DEBUG:"); // TODO remove
-				System.out.println(Arrays.toString(receivedPacket.getPayload())); // TODO payloadBytes?
-				System.out.println(Arrays.toString(FileTransferProtocol.INIT_SESSION.getBytes()));
-
 				if (receivedPacket.getPayloadString().startsWith(FileTransferProtocol.DISCOVER)) {
 					this.handleDiscover(receivedPacket);
-				} else if (receivedPacket.getPayloadString().startsWith(FileTransferProtocol.INIT_SESSION)) {
+				} else if (receivedPacket.getPayloadString()
+						.startsWith(FileTransferProtocol.INIT_SESSION)) {
 					this.handleSessionRequest(receivedPacket);
 				} else {
 					this.showNamedError("Unknown packet: dropping");
 					this.showNamedError("Content was: : " + receivedPacket.getPayloadString()
-							+ " (in bytes: " + Arrays.toString(receivedPacket.getPayload()) + ")"); //TODO no payloadBytes
-					// TODO send unknown message back? 
+							+ " (in bytes: " + Arrays.toString(receivedPacket.getPayload()) + ")");
 				}
-
 			}
-//		} catch (exceptions.ExitProgram eExit) { // TODO how to throw? 
-//			if (TUI.getBoolean("Are you sure you want to quit?")) {
-//				this.shutdown();
-//			}
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (PacketException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (UtilDatagramException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		
+			
+		} catch (IOException | PacketException | UtilDatagramException e) {
+			this.showNamedError("Something went wrong: " + e.getLocalizedMessage());
+			if (textUI.getBoolean("Do you want to quit?")) {
+				this.shutdown();
+			}
+		} 
 	}
 
 	/**
-	 * TODO
+	 * Respond to a DISCOVER send by a client.
 	 */
-	public void handleDiscover(Packet sessionInitPacket) {
-		InetAddress clientAddress = sessionInitPacket.getSourceAddress();
+	public void handleDiscover(Packet discoverPacket) {
+		InetAddress clientAddress = discoverPacket.getSourceAddress();
 		
 		this.showNamedMessage("DISCOVER packet received from " + clientAddress + " >> responding");
 		byte[] discoverResponse = (FileTransferProtocol.DISCOVER +
 				FileTransferProtocol.DELIMITER + this.name).getBytes();
 		this.sendBytesToClient(discoverResponse,
-				sessionInitPacket.getSourceAddress(),
-				sessionInitPacket.getSourcePort(),
-				discoverResponse.length - 1 + 1); // TODO make this more nice + note offset is string end +1 (note length starts at 1)
+				discoverPacket.getSourceAddress(),
+				discoverPacket.getSourcePort(),
+				discoverResponse.length);
 		
 	}
 	
 	/**
-	 * TODO
+	 * Respond to a INIT_SESSION send by a client, and start a new clientHandler.
 	 */
 	public void handleSessionRequest(Packet sessionInitPacket) {
 		InetAddress clientAddress = sessionInitPacket.getSourceAddress();
-
-		String[] sessionRequest = sessionInitPacket.getPayloadString().split(FileTransferProtocol.DELIMITER);
+		String[] sessionRequest = sessionInitPacket.getPayloadString()
+				.split(FileTransferProtocol.DELIMITER);
 		String clientName;
 		
 		if (sessionRequest[1] != null && !sessionRequest[1].isBlank()) {
 			clientName = sessionRequest[1];
 		} else {
-			clientName = "Client " 
-					+ String.format("%02d", next_client_no++);
+			clientName = "Client " + String.format("%02d", nextClientNr++);
 		}
-		this.showNamedMessage("A new client [" + clientName 
-				+ "] (" + next_client_no 
-				+  ") is trying to connect from "
-				+ clientAddress + "...");
+		this.showNamedMessage("A new client [" + clientName + "] (" + nextClientNr 
+				+  ") is trying to connect from " + clientAddress + "...");
 
 		if (this.sandboxClients && !clientName.equals(this.adminName)) {
 			this.showNamedMessage("Assinging sandbox to this client...");
-			this.assignClientSandbox(clientName);
+			try {
+				this.assignClientSandbox(clientName);
+			} catch (ServerFailureException e) {
+				byte[] failure = (FileTransferProtocol.FAILED + FileTransferProtocol.DELIMITER 
+						+ "Sandboxing failed: " + e.getLocalizedMessage()).getBytes();
+				this.sendBytesToClient(failure,
+						clientAddress, sessionInitPacket.getSourcePort(), failure.length); 
+				this.showNamedError("Client notified of failure: " + e.getLocalizedMessage());
+			}
 		}
 
 		try {
+			// create new clientHandler and start it
 			DatagramSocket sessionSocket = TransportLayer.openNewDatagramSocket(); 
 			FileTransferClientHandler handler = new FileTransferClientHandler(sessionSocket,
-					sessionInitPacket, this, clientName); //TODO (sock, this, name);
-
+					sessionInitPacket, this, clientName);
 			new Thread(handler).start();
 			clients.add(handler);
 
+			// respond to user
 			int sessionPortNumber = handler.getPort();
 			byte[] initResponse = (FileTransferProtocol.INIT_SESSION +
 					FileTransferProtocol.DELIMITER + sessionPortNumber).getBytes();
 			this.sendBytesToClient(initResponse,
 					sessionInitPacket.getSourceAddress(),
 					sessionInitPacket.getSourcePort(),
-					initResponse.length - 1 + 1); // TODO make this more nice + note offset is string end +1 (note length starts at 1)
+					initResponse.length);
 
 			this.showNamedMessage("New client [" + clientName + "] connected, on port " 
 					+ handler.getPort() + " !"); 
@@ -332,35 +356,29 @@ public class FileTransferServer implements Runnable {
 
 
 	/**
-	 * Removes a clientHandler from the client list.
+	 * Removes a clientHandler from the client list,
+	 *  e.g. after a certain silent time.
 	 * @requires client != null
 	 */
 	public void removeClient(FileTransferClientHandler client) {
 		this.clients.remove(client);
-		if (this.clientsWaitingList.contains(client)) {
-			this.clientsWaitingList.remove(client);
-		}
-		// TODO remove client after certain silent time
 	}
 	
 	/**
-	 * Shutdown server TODO (try with resources?!)
+	 * Shutdown server.
 	 */
 	public void shutdown() {
 		this.showNamedMessage("See you later!");
-
-		// see example on github? 
-		this.socket.close(); // TODO make a method for this, ensure!
-		
+		this.socket.close(); 
 		util.TimeOut.stop();
 		this.showNamedMessage("TimeOut helper stopped.");
 
 	}
 	
 	/**
-	 * Returns the name of the server.
+	 * Returns the name of this server.
 	 * 
-	 * @requires SERVERNAME != null;
+	 * @requires this.name != null;
 	 * @return the name of the sever.
 	 */
 	public String getServerName() {
@@ -368,28 +386,37 @@ public class FileTransferServer implements Runnable {
 	}
 	
 	/**
-	 * TODO return fileStorage path of this server
-	 * TODO maybe create substorage per client?
+	 * Lookup the fileStorage path of a user on this server.
+	 * @return Path to file storage of client
 	 */
 	public Path getFileStorage(String clientName) {
 		Path clientFileStorage;
 
 		if (clientName.equals(this.adminName) || !this.sandboxClients) {
-			this.showNamedMessage("Client [" + clientName + "]=> Not sandboxing or admin detected: access to server storage granted");
+			this.showNamedMessage("Client [" + clientName + "]=> "
+					+ "Not sandboxing or admin detected: access to server storage granted");
 			clientFileStorage = this.fileStorage;
 		} else { 
-			//		clientFileStorage = clientStorage // TODO implement as key-value pairs
-			this.showNamedMessage("Client [" + clientName + "]=> Sandboxing: access to server fileStorage denied");
+			this.showNamedMessage("Client [" + clientName + "]=> "
+					+ "Sandboxing: access to server fileStorage denied");
 			clientFileStorage = this.sandboxStorages.get(clientName);
 		}
 
 		return clientFileStorage;
 	}
 	
-	public void sendBytesToClient(byte[] bytesToSend, InetAddress clientAddress, int clientPort, int byteOffset) { // TODO put in separate utility?
+	/**
+	 * Send bytes to the client, contained in a Packet.
+	 * @param bytesToSend to server
+	 * @param clientAddress to send to
+	 * @param clientPort to send to
+	 * @param byteOffset due to string part
+	 */
+	public void sendBytesToClient(byte[] bytesToSend,
+			InetAddress clientAddress, int clientPort, int byteOffset) {
 		try { // to construct and send a packet
 			Packet packet = new Packet(
-						0, // TODO id
+						0,
 						this.ownAddress,
 						this.ownPort, 
 						clientAddress, 
@@ -404,85 +431,81 @@ public class FileTransferServer implements Runnable {
 					clientPort
 			); 
 			
-			this.showNamedMessage("Bytes send!");
+			// this.showNamedMessage("Bytes send!");  // for debugging
 			
-		} catch (UnknownHostException | PacketException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (UtilByteException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (UtilDatagramException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+		} catch (PacketException | IOException | UtilByteException | UtilDatagramException e) {
+			this.showNamedError("Something went wrong while sending bytes: "
+					+ e.getLocalizedMessage());
 		}
 	}
 	
 	/**
-	 * Setup a separate storage for this individual client
-	 * @param name
-	 * @return
+	 * Create a separate storage for this individual client.
+	 * @param name of the client
+	 * @return Path to file storage of this client
+	 * @throws ServerFailureException 
 	 */
-	public Path assignClientSandbox(String clientName) {
+	public Path assignClientSandbox(String clientName) throws ServerFailureException {
 		this.showNamedMessage("Server file storage set to: " + this.fileStorage.toString());
 
 		Path sandboxedStorage = this.fileStorage.resolve(clientName);
 		this.showNamedMessage("Client File storage set to: " + sandboxedStorage.toString());
 
-
-		//			if (!Files.exists(fileStorage)) { // TODO: use if or catch exception
 		try {
 			Files.createDirectory(sandboxedStorage);
-			this.showNamedMessage("File storage directory did not exist: created " + sandboxedStorage + " in server file storage"); 
+			this.showNamedMessage("File storage directory did not exist:"
+					+ " created " + sandboxedStorage + " in server file storage"); 
 		} catch (java.nio.file.FileAlreadyExistsException eExist) {
-			this.showNamedMessage("File storage directory already exist: not doing anything with " + sandboxedStorage + " in server file storage");
+			this.showNamedMessage("File storage directory already exist:"
+					+ " not doing anything with " + sandboxedStorage + " in server file storage");
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			this.showNamedError("Failed to create file storage: server CRASHED because " + e.getLocalizedMessage());
-			e.printStackTrace();
+			this.showNamedError("Failed to create file storage because: " 
+					+ e.getLocalizedMessage());
+			throw new ServerFailureException("Failed to create file storage because: " 
+					+ e.getLocalizedMessage());
 		}
-		//	        } else {
-		//		    	this.showNamedMessage("File storage directory already exist: not doing anything with " + fileStorageDirName + " in server root"); 
-		//	        }
+
 		
 		if (this.sandboxStorages.containsKey(clientName)) {
 			this.sandboxStorages.replace(clientName, sandboxedStorage);
-			this.showNamedMessage("Client storage for " + clientName + "reset to " + sandboxedStorage.toString());
+			this.showNamedMessage("Client storage for " + clientName 
+					+ "reset to " + sandboxedStorage.toString());
 			this.showNamedError("Note: access to previously assigned storage(s) is now replaced!");
 		} else {
 			this.sandboxStorages.put(clientName, sandboxedStorage);
-			this.showNamedMessage("Client storage for " + clientName + "set to " + sandboxedStorage.toString());
+			this.showNamedMessage("Client storage for " + clientName 
+					+ "set to " + sandboxedStorage.toString());
 		}
 		return sandboxedStorage;
 	}
 	
 	/**
-	 * TODO cannot override from TUI?
-	 * @param message
+	 * Show message on the textUIT with name of this client.
+	 * @param message to display
 	 */
 	public void showNamedMessage(String message) {
-		TUI.showNamedMessage(this.name, message);
+		textUI.showNamedMessage(this.name, message);
 	}
 	
 	/**
-	 * TODO cannot override from TUI?
-	 * @param message
+	 * Show error on the textUIT with name of this client.
+	 * @param message to display
 	 */
 	public void showNamedError(String message) {
-		TUI.showNamedError(this.name, message);
+		textUI.showNamedError(this.name, message);
 	}
 
 	// ------------------ Main --------------------------
 
-	/** Start a new FileTransferServer. */
+	/**
+	 * Use this main method to boot a new FileTransfer server.
+	 * @param args
+	 */
 	public static void main(String[] args) {
 
 		System.out.println("Welcome to the FileTransfer Server! \n Starting...");
 		
-		int port; // TODO duplicate name: change? 
+		int port;
 		
 		if (args.length < 0 || args.length > 1) {
 			System.out.println("Syntax: FileTranferServer <port>");
