@@ -5,7 +5,6 @@ import java.io.FileFilter;
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.file.Path;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -18,6 +17,7 @@ import exceptions.ServerFailureException;
 import exceptions.UtilByteException;
 import exceptions.UtilDatagramException;
 import helpers.DownloadHelper;
+import helpers.Helper;
 import helpers.UploadHelper;
 import network.Packet;
 import network.TransportLayer;
@@ -63,12 +63,12 @@ public class FileTransferClientHandler implements Runnable {
 	/**
 	 * List of downloads, one for each connected downloadHelper. 
 	 */
-	private List<DownloadHelper> downloads;
+	private List<Helper> downloads;
 
 	/**
 	 * List of uploads, one for each connected uploadHelper. 
 	 */
-	private List<UploadHelper> uploads;
+	private List<Helper> uploads;
 
 	/**
 	 *  The TUI of this FileTransferServer.
