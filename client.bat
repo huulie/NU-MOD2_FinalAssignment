@@ -1,0 +1,3 @@
+java -classpath ^
+FileTransferClient-1.0.0.jar^
+ client.Client
