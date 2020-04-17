@@ -70,6 +70,10 @@ task clientJar(type: Jar) {
     }
 
     baseName = 'FileTransferClient'
+    
+    // to include all dependencies:
+    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    with jar
 }
 
 // need to configure this one from scratch
@@ -85,6 +89,10 @@ task serverJar(type: Jar) {
     }    
 
     baseName = 'FileTransferServer'
+    
+    // to include all dependencies:
+    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    with jar
 }
 
 // one way to make `gradle build` run both Jar tasks
