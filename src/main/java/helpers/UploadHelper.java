@@ -301,7 +301,7 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 
 		if (!waitForInitiate) { // running on a client: show progress bar
 			try (ProgressBar pb = new ProgressBar(this.fileToRead.getName(), this.totalPackets, 1, 
-					System.out, ProgressBarStyle.COLORFUL_UNICODE_BLOCK, " Bytes", 1, false, null)) {
+					System.out, ProgressBarStyle.COLORFUL_UNICODE_BLOCK, " Packets", 1, false, null)) {
 				pb.setExtraMessage("Uploading..."); 
 				while (!(filePointer >= fileContents.length && totalAckPackets == totalPackets)) { 
 					// while not (reached end of the file AND all packets are acknowledged)
@@ -313,9 +313,9 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 						this.listenForAck();
 						pb.stepTo(this.totalAckPackets);
 					}
-					pb.setExtraMessage("Done!"); 
-
 				}
+				pb.setExtraMessage("Done!"); 
+
 			}
 		} else { // running on server: more textual output
 			while (!(filePointer >= fileContents.length && totalAckPackets == totalPackets)) { 

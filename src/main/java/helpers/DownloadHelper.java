@@ -307,7 +307,9 @@ public class DownloadHelper implements Helper, Runnable, util.ITimeoutEventHandl
 			}
 			
 		} catch (SocketTimeoutException eTO) {
-			this.showNamedMessage("Socket timed-out: retry receive");
+			if (!initiate) { // running on server: more textual output
+				this.showNamedMessage("Socket timed-out: retry receive");
+			}
 			this.receiveBytes();
 		} catch (IOException | PacketException | UtilDatagramException e) {
 			this.showNamedError("Receiving packet failed: " + e.getLocalizedMessage());
@@ -355,8 +357,12 @@ public class DownloadHelper implements Helper, Runnable, util.ITimeoutEventHandl
 			this.sendAck(packetNr); // resend ACK
 		
 		} else {
+			if (initiate) { // running on client: add line break after progress bar
+				this.showNamedMessage(" ");
+			}
 			this.showNamedMessage("DROPPING packet with ID = " + receivedPacket.getId());
 			this.droppedPackets++;
+			this.sendAck(this.LFR); // resend last ACK
 		}
 	}
 
@@ -370,7 +376,7 @@ public class DownloadHelper implements Helper, Runnable, util.ITimeoutEventHandl
 		
 		this.sendBytesToUploader(packetID, FileTransferProtocol.ACK, false);
 		if (!initiate) { // running on server: more textual output
-		this.showNamedMessage("Packet " + nrToAck + " with ID = " + packetID + " ACK send");
+			this.showNamedMessage("Packet " + nrToAck + " with ID = " + packetID + " ACK send");
 		}
 		
 		// check if ID could wrap around in the new receive window:
