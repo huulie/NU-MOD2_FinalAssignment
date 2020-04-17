@@ -63,7 +63,7 @@ public class Packet {
 	private int byteOffset;
 	
 	/**
-	 * Create a Packet
+	 * Create a Packet.
 	 * @param id of new Packet
 	 * @param sourceAddress of new Packet
 	 * @param sourcePort of new Packet

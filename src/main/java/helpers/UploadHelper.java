@@ -15,6 +15,8 @@ import client.FileTransferClient;
 import exceptions.PacketException;
 import exceptions.UtilByteException;
 import exceptions.UtilDatagramException;
+import me.tongfei.progressbar.ProgressBar;
+import me.tongfei.progressbar.ProgressBarStyle;
 import network.Packet;
 import network.TransportLayer;
 import protocol.FileTransferProtocol;
@@ -296,21 +298,39 @@ public class UploadHelper implements Helper, Runnable, util.ITimeoutEventHandler
 	 * Transfer the byte[] of the File to the downloader, contained in Packets.
 	 */
 	public void transferBytes() {
-		// TODO when running on client, also here use a progress bar (first solve repeating issue)
-		
-		while (!(filePointer >= fileContents.length && totalAckPackets == totalPackets)) { 
-			// while not (reached end of the file AND all packets are acknowledged)
 
-			if ((currentPacketToSend <= LAR + SWS // inside send window size = send the packet
-					&& currentPacketToSend < totalPackets)
-					&& !this.paused) { // if paused only listen 
-				this.sendNextPacket();
-			} else {
-				this.listenForAck();
+		if (!waitForInitiate) { // running on a client: show progress bar
+			try (ProgressBar pb = new ProgressBar(this.fileToRead.getName(), this.totalPackets, 1, 
+					System.out, ProgressBarStyle.COLORFUL_UNICODE_BLOCK, " Bytes", 1, false, null)) {
+				pb.setExtraMessage("Uploading..."); 
+				while (!(filePointer >= fileContents.length && totalAckPackets == totalPackets)) { 
+					// while not (reached end of the file AND all packets are acknowledged)
+					if ((currentPacketToSend <= LAR + SWS // inside send window size = send packet
+							&& currentPacketToSend < totalPackets)
+							&& !this.paused) { // if paused only listen 
+						this.sendNextPacket();
+					} else {
+						this.listenForAck();
+						pb.stepTo(this.totalAckPackets);
+					}
+					pb.setExtraMessage("Done!"); 
+
+				}
+			}
+		} else { // running on server: more textual output
+			while (!(filePointer >= fileContents.length && totalAckPackets == totalPackets)) { 
+				// while not (reached end of the file AND all packets are acknowledged)
+				if ((currentPacketToSend <= LAR + SWS // inside send window size = send the packet
+						&& currentPacketToSend < totalPackets)
+						&& !this.paused) { // if paused only listen 
+					this.sendNextPacket();
+				} else {
+					this.listenForAck();
+				}
 			}
 		}
 		this.showNamedMessage("Sending completed!"); 
-		
+
 		this.complete = true;
 	}
 	

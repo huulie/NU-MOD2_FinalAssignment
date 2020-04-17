@@ -376,7 +376,7 @@ public class FileTransferClient {
 	 */
 	public void clientRunning() {
 		while (this.running) {
-			String userInputString = textUI.getString("Please input:");
+			String userInputString = textUI.getString("Please input (or type 'help'):");
 			this.processUserInput(userInputString);
 		}
 	}
